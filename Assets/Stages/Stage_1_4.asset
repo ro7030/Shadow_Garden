@@ -1,0 +1,78 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e9ad4c2c11f514739aa5a4c4dd11a7f0, type: 3}
+  m_Name: Stage_1_4
+  m_EditorClassIdentifier: ShadowGarden.Infrastructure::ShadowGarden.Infrastructure.StageDefinitionAsset
+  stageId: 1-4
+  playerStart:
+    x: 1
+    y: 2
+  safeCells:
+  - x: 0
+    y: 2
+  - x: 1
+    y: 2
+  - x: 2
+    y: 2
+  - x: 1
+    y: 3
+  - x: 1
+    y: 4
+  - x: 0
+    y: 4
+  - x: 2
+    y: 4
+  - x: 3
+    y: 4
+  - x: 4
+    y: 4
+  - x: 4
+    y: 5
+  - x: 5
+    y: 5
+  - x: 6
+    y: 5
+  - x: 6
+    y: 4
+  - x: 7
+    y: 4
+  - x: 7
+    y: 3
+  - x: 7
+    y: 2
+  lamps:
+  - position:
+      x: 1
+      y: 2
+    channel: 0
+    initialDirection: 1
+  - position:
+      x: 1
+      y: 4
+    channel: 1
+    initialDirection: 0
+  pillars:
+  - position:
+      x: 3
+      y: 2
+    channel: 0
+    height: 3
+  - position:
+      x: 5
+      y: 4
+    channel: 1
+    height: 3
+  clearGoalType: 1
+  goalPosition:
+    x: 7
+    y: 2
+  timeLimitSeconds: 150

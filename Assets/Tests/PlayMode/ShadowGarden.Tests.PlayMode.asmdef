@@ -1,0 +1,24 @@
+{
+    "name": "ShadowGarden.Tests.PlayMode",
+    "rootNamespace": "ShadowGarden.Tests.PlayMode",
+    "references": [
+        "ShadowGarden.Core",
+        "ShadowGarden.Runtime",
+        "ShadowGarden.Presentation",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

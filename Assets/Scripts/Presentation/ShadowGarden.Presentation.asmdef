@@ -1,0 +1,19 @@
+{
+    "name": "ShadowGarden.Presentation",
+    "rootNamespace": "ShadowGarden.Presentation",
+    "references": [
+        "ShadowGarden.Core",
+        "ShadowGarden.Runtime",
+        "ShadowGarden.Infrastructure",
+        "Unity.InputSystem"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

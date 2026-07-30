@@ -1,0 +1,16 @@
+{
+    "name": "ShadowGarden.Infrastructure",
+    "rootNamespace": "ShadowGarden.Infrastructure",
+    "references": [
+        "ShadowGarden.Core"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
