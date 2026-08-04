@@ -119,6 +119,81 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!1 &54016920
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 54016922}
+  - component: {fileID: 54016924}
+  - component: {fileID: 54016923}
+  - component: {fileID: 54016921}
+  m_Layer: 0
+  m_Name: GameplayBoard
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &54016921
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 54016920}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e53f269234abf414f9b54da27ec1742d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: ShadowGarden.Presentation::ShadowGarden.Presentation.OnboardingHintsPresenter
+  wasdRoot: {fileID: 0}
+  qeRoot: {fileID: 0}
+--- !u!4 &54016922
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 54016920}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2139046377}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &54016923
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 54016920}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2ec104687970f4c1b9e6012cfbdc2983, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: ShadowGarden.Presentation::ShadowGarden.Presentation.PlayerPresenter
+  playerVisual: {fileID: 0}
+--- !u!114 &54016924
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 54016920}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1e1ef51cd2c3f40049928b17cce3158e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: ShadowGarden.Presentation::ShadowGarden.Presentation.BoardPresenter
+  cellRoot: {fileID: 0}
+  showDebugCounts: 0
 --- !u!1 &272749950
 GameObject:
   m_ObjectHideFlags: 0
@@ -1341,6 +1416,9 @@ GameObject:
   - component: {fileID: 2139046377}
   - component: {fileID: 2139046376}
   - component: {fileID: 2139046375}
+  - component: {fileID: 2139046380}
+  - component: {fileID: 2139046379}
+  - component: {fileID: 2139046378}
   m_Layer: 0
   m_Name: MainApp
   m_TagString: Untagged
@@ -1363,6 +1441,8 @@ MonoBehaviour:
   inputActions: {fileID: -944628639613478452, guid: bae3561b2124f4fe2a88343d37303af7, type: 3}
   stageCatalog: {fileID: 11400000, guid: b2c49cfb3db9f4411a7e33376f68cfaf, type: 2}
   screenRouter: {fileID: 2139046376}
+  gameplayHost: {fileID: 2139046380}
+  flowScreens: {fileID: 2139046379}
   usePlayerPrefs: 1
 --- !u!114 &2139046376
 MonoBehaviour:
@@ -1395,9 +1475,57 @@ Transform:
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 54016922}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2139046378
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2139046374}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f030206e0617741c2952b6b8a16c8212, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: ShadowGarden.Presentation::ShadowGarden.Presentation.MainPlayHud
+  stageLabel: {fileID: 0}
+  timerLabel: {fileID: 0}
+  goalLabel: {fileID: 0}
+  root: {fileID: 0}
+--- !u!114 &2139046379
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2139046374}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c4bb88f721b5d4ada93723a7399a281f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: ShadowGarden.Presentation::ShadowGarden.Presentation.MainFlowScreens
+  router: {fileID: 0}
+  main: {fileID: 0}
+--- !u!114 &2139046380
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2139046374}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8838c1b75db69465c89b44544d1f9494, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: ShadowGarden.Presentation::ShadowGarden.Presentation.MainGameplayHost
+  boardPresenter: {fileID: 54016924}
+  playerPresenter: {fileID: 54016923}
+  playHud: {fileID: 2139046378}
+  onboarding: {fileID: 54016921}
+  hudParent: {fileID: 1569315002}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

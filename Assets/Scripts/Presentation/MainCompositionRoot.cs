@@ -6,29 +6,37 @@ using UnityEngine.InputSystem;
 namespace ShadowGarden.Presentation
 {
     /// <summary>
-    /// Main scene composition root: AppState flow, screen roots, input maps, save boot.
-    /// Does not host TestField puzzle play — StageSession stays on TestField / later stages.
+    /// Main scene composition root: AppState flow, screens, input maps, save, and 1-1 gameplay host.
+    /// TestField remains a separate composition and is not referenced here.
     /// </summary>
     public sealed class MainCompositionRoot : MonoBehaviour
     {
         [SerializeField] private InputActionAsset inputActions;
         [SerializeField] private StageCatalogAsset stageCatalog;
         [SerializeField] private AppScreenRouter screenRouter;
+        [SerializeField] private MainGameplayHost gameplayHost;
+        [SerializeField] private MainFlowScreens flowScreens;
         [SerializeField] private bool usePlayerPrefs = true;
 
         private GameFlowController _flow;
         private InputRouter _input;
         private SaveService _save;
+        private string _pendingStageId = "1-1";
 
         public GameFlowController Flow => _flow;
         public SaveService Save => _save;
         public StageCatalogAsset Catalog => stageCatalog;
         public InputRouter Input => _input;
+        public MainGameplayHost Gameplay => gameplayHost;
         public AppState CurrentState => _flow?.Current ?? AppState.Title;
+        public string PendingStageId => _pendingStageId;
 
         private void Awake()
         {
             EnsureScreenRouter();
+            EnsureGameplayHost();
+            EnsureFlowScreens();
+
             _flow = new GameFlowController(AppState.Title);
             _flow.StateChanged += OnStateChanged;
 
@@ -41,11 +49,15 @@ namespace ShadowGarden.Presentation
                 ? new SaveService(new PlayerPrefsSaveRepository())
                 : new SaveService(new MemoryProgressSaveRepository(), new MemoryUiPreferencesRepository());
             _save.LoadAll();
+
+            gameplayHost?.Bind(this);
+            flowScreens?.Bind(this, screenRouter);
         }
 
         private void Start()
         {
             BootInitialState();
+            flowScreens?.RefreshWorldMapUnlock();
         }
 
         private void OnDestroy()
@@ -63,7 +75,8 @@ namespace ShadowGarden.Presentation
             SaveService save,
             InputRouter input,
             AppScreenRouter router,
-            StageCatalogAsset catalog)
+            StageCatalogAsset catalog,
+            MainGameplayHost host = null)
         {
             if (_flow != null)
             {
@@ -76,6 +89,13 @@ namespace ShadowGarden.Presentation
             _input = input;
             screenRouter = router;
             stageCatalog = catalog;
+            if (host != null)
+            {
+                gameplayHost = host;
+            }
+
+            gameplayHost?.Bind(this);
+            flowScreens?.Bind(this, screenRouter);
         }
 
         public AppStateChangeResult RequestState(AppState to)
@@ -116,9 +136,10 @@ namespace ShadowGarden.Presentation
 
         public void StartStage(string stageId)
         {
-            if (stageCatalog != null && !string.IsNullOrWhiteSpace(stageId))
+            if (!string.IsNullOrWhiteSpace(stageId))
             {
-                _save?.RecordStageSelected(stageId);
+                _pendingStageId = stageId.Trim();
+                _save?.RecordStageSelected(_pendingStageId);
             }
 
             RequestState(AppState.Playing);
@@ -129,16 +150,13 @@ namespace ShadowGarden.Presentation
         public void NotifyCleared(string stageId, long elapsedMilliseconds)
         {
             _save?.RecordStageCleared(stageId, elapsedMilliseconds);
-            if (stageId == "3-4")
-            {
-                RequestState(AppState.Cleared);
-                return;
-            }
-
             RequestState(AppState.Cleared);
         }
 
-        public void RetryFromGameOver() => RequestState(AppState.Playing);
+        public void RetryFromGameOver()
+        {
+            RequestState(AppState.Playing);
+        }
 
         public void ReturnToWorldMap() => RequestState(AppState.WorldMap);
 
@@ -153,6 +171,7 @@ namespace ShadowGarden.Presentation
             screenRouter?.Show(initial);
             _input?.SetTransitionInputLock(false);
             _input?.ApplyForAppState(initial);
+            gameplayHost?.StopPlay();
         }
 
         private void OnStateChanged(AppState from, AppState to)
@@ -160,6 +179,31 @@ namespace ShadowGarden.Presentation
             screenRouter?.Show(to);
             _input?.SetTransitionInputLock(false);
             _input?.ApplyForAppState(to);
+
+            if (to == AppState.Playing)
+            {
+                gameplayHost?.Bind(this);
+                if (from == AppState.GameOver || from == AppState.Cleared)
+                {
+                    gameplayHost?.RestartActiveStage();
+                }
+                else
+                {
+                    gameplayHost?.BeginStage(_pendingStageId);
+                }
+            }
+            else if (from == AppState.Playing)
+            {
+                if (to == AppState.WorldMap || to == AppState.Title)
+                {
+                    gameplayHost?.StopPlay();
+                }
+            }
+
+            if (to == AppState.WorldMap)
+            {
+                flowScreens?.RefreshWorldMapUnlock();
+            }
         }
 
         private void EnsureScreenRouter()
@@ -170,10 +214,33 @@ namespace ShadowGarden.Presentation
             }
         }
 
+        private void EnsureGameplayHost()
+        {
+            if (gameplayHost == null)
+            {
+                gameplayHost = GetComponent<MainGameplayHost>();
+            }
+
+            if (gameplayHost == null)
+            {
+                gameplayHost = gameObject.AddComponent<MainGameplayHost>();
+            }
+        }
+
+        private void EnsureFlowScreens()
+        {
+            if (flowScreens == null)
+            {
+                flowScreens = GetComponent<MainFlowScreens>();
+            }
+
+            if (flowScreens == null)
+            {
+                flowScreens = gameObject.AddComponent<MainFlowScreens>();
+            }
+        }
+
 #if UNITY_EDITOR
-        /// <summary>
-        /// Editor helper used when constructing Main scene roots programmatically.
-        /// </summary>
         public static void WireSerialized(
             MainCompositionRoot root,
             InputActionAsset actions,

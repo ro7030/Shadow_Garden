@@ -1,13 +1,19 @@
+using System.Collections;
 using UnityEngine;
 
 namespace ShadowGarden.Presentation
 {
     /// <summary>
-    /// Cloaked Moa silhouette — larger navy cape readable on cream tiles.
+    /// Cloaked Moa silhouette with optional move / pass / fall presentation tweens.
+    /// Does not recompute Core rules — only follows positions supplied by the host.
     /// </summary>
     public sealed class PlayerPresenter : MonoBehaviour
     {
         [SerializeField] private Transform playerVisual;
+
+        private Coroutine _motion;
+
+        public Transform Visual => playerVisual;
 
         public void EnsureVisual()
         {
@@ -47,10 +53,87 @@ namespace ShadowGarden.Presentation
             playerVisual = root.transform;
         }
 
-        public void Render(ShadowGarden.Core.GridPosition position)
+        public void Snap(ShadowGarden.Core.GridPosition position)
         {
             EnsureVisual();
+            StopMotion();
             playerVisual.position = GridWorld.ToWorld(position, -0.38f);
+            playerVisual.localScale = Vector3.one;
+        }
+
+        public void Render(ShadowGarden.Core.GridPosition position) => Snap(position);
+
+        public Coroutine AnimateMove(ShadowGarden.Core.GridPosition from, ShadowGarden.Core.GridPosition to, float seconds)
+        {
+            EnsureVisual();
+            StopMotion();
+            _motion = StartCoroutine(LerpWorld(
+                GridWorld.ToWorld(from, -0.38f),
+                GridWorld.ToWorld(to, -0.38f),
+                Mathf.Max(0.01f, seconds)));
+            return _motion;
+        }
+
+        public Coroutine AnimatePassThroughDoor(ShadowGarden.Core.GridPosition goal, float seconds)
+        {
+            EnsureVisual();
+            StopMotion();
+            var start = GridWorld.ToWorld(goal, -0.38f);
+            var end = start + new Vector3(0.65f, 0f, -0.35f);
+            _motion = StartCoroutine(LerpWorld(start, end, Mathf.Max(0.01f, seconds), shrink: true));
+            return _motion;
+        }
+
+        public Coroutine AnimateCliffFall(ShadowGarden.Core.GridPosition cell, float seconds)
+        {
+            EnsureVisual();
+            StopMotion();
+            var start = GridWorld.ToWorld(cell, -0.38f);
+            var end = start + new Vector3(0f, -1.4f, 0.2f);
+            _motion = StartCoroutine(LerpWorld(start, end, Mathf.Max(0.01f, seconds), shrink: true));
+            return _motion;
+        }
+
+        private IEnumerator LerpWorld(Vector3 from, Vector3 to, float seconds, bool shrink = false)
+        {
+            var elapsed = 0f;
+            playerVisual.position = from;
+            var startScale = Vector3.one;
+            while (elapsed < seconds)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                var t = Mathf.Clamp01(elapsed / seconds);
+                var eased = t * t * (3f - 2f * t);
+                playerVisual.position = Vector3.LerpUnclamped(from, to, eased);
+                if (shrink)
+                {
+                    playerVisual.localScale = Vector3.Lerp(startScale, Vector3.one * 0.15f, eased);
+                }
+
+                yield return null;
+            }
+
+            playerVisual.position = to;
+            if (shrink)
+            {
+                playerVisual.localScale = Vector3.one * 0.15f;
+            }
+
+            _motion = null;
+        }
+
+        private void StopMotion()
+        {
+            if (_motion != null)
+            {
+                StopCoroutine(_motion);
+                _motion = null;
+            }
+
+            if (playerVisual != null)
+            {
+                playerVisual.localScale = Vector3.one;
+            }
         }
 
         private static void ApplyColor(GameObject go, Color color)

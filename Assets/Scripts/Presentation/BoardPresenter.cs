@@ -220,6 +220,106 @@ namespace ShadowGarden.Presentation
             showDebugCounts = enabled;
         }
 
+        /// <summary>
+        /// Short visual reaction on pillars belonging to the approached lamp channel.
+        /// Presentation-only — does not change Core shadow counts.
+        /// </summary>
+        public void PulseChannelPillars(StageDefinition stage, ChannelId channel, float durationSeconds = 0.3f)
+        {
+            if (stage == null || _pillars == null)
+            {
+                return;
+            }
+
+            StopCoroutine(nameof(PulseChannelRoutine));
+            StartCoroutine(PulseChannelRoutine(stage, channel, durationSeconds));
+        }
+
+        public Coroutine PlayDoorOpen(StageDefinition stage, float durationSeconds)
+        {
+            if (stage == null || stage.ClearGoalType != ClearGoalType.ExitDoor)
+            {
+                return null;
+            }
+
+            return StartCoroutine(DoorOpenRoutine(stage.GoalPosition, durationSeconds));
+        }
+
+        private System.Collections.IEnumerator PulseChannelRoutine(
+            StageDefinition stage,
+            ChannelId channel,
+            float duration)
+        {
+            var targets = new System.Collections.Generic.List<Transform>();
+            foreach (var pillar in stage.Pillars)
+            {
+                if (pillar.Channel != channel)
+                {
+                    continue;
+                }
+
+                var t = _pillars[pillar.Position.X, pillar.Position.Y];
+                if (t != null)
+                {
+                    targets.Add(t);
+                }
+            }
+
+            var elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                var wave = 1f + Mathf.Sin(elapsed * 18f) * 0.08f;
+                for (var i = 0; i < targets.Count; i++)
+                {
+                    if (targets[i] != null)
+                    {
+                        targets[i].localScale = Vector3.one * wave;
+                    }
+                }
+
+                yield return null;
+            }
+
+            for (var i = 0; i < targets.Count; i++)
+            {
+                if (targets[i] != null)
+                {
+                    targets[i].localScale = Vector3.one;
+                }
+            }
+        }
+
+        private System.Collections.IEnumerator DoorOpenRoutine(GridPosition goal, float duration)
+        {
+            if (_labels == null || !_size.Contains(goal))
+            {
+                yield break;
+            }
+
+            var label = _labels[goal.X, goal.Y];
+            var cell = _cells[goal.X, goal.Y];
+            var elapsed = 0f;
+            var startColor = cell != null ? cell.color : Color.cyan;
+            while (elapsed < duration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                var t = Mathf.Clamp01(elapsed / duration);
+                if (label != null)
+                {
+                    label.text = t < 0.5f ? "⌂" : "열린 문";
+                    label.color = Color.Lerp(Color.cyan, Color.white, t);
+                }
+
+                if (cell != null)
+                {
+                    cell.color = Color.Lerp(startColor, new Color(0.75f, 0.95f, 1f, 1f), t);
+                }
+
+                yield return null;
+            }
+        }
+
         private void BuildSkyBackdrop()
         {
             var sky = new GameObject("SkyBackdrop");
