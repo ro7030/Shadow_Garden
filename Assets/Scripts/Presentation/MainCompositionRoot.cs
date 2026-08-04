@@ -6,7 +6,7 @@ using UnityEngine.InputSystem;
 namespace ShadowGarden.Presentation
 {
     /// <summary>
-    /// Main scene composition root: AppState flow, screens, input maps, save, and 1-1 gameplay host.
+    /// Main scene composition root: AppState flow, screens, input maps, save, and gameplay host.
     /// TestField remains a separate composition and is not referenced here.
     /// </summary>
     public sealed class MainCompositionRoot : MonoBehaviour
@@ -22,6 +22,8 @@ namespace ShadowGarden.Presentation
         private InputRouter _input;
         private SaveService _save;
         private string _pendingStageId = "1-1";
+        private string _lastClearedStageId;
+        private long _lastClearElapsedMs;
 
         public GameFlowController Flow => _flow;
         public SaveService Save => _save;
@@ -30,6 +32,8 @@ namespace ShadowGarden.Presentation
         public MainGameplayHost Gameplay => gameplayHost;
         public AppState CurrentState => _flow?.Current ?? AppState.Title;
         public string PendingStageId => _pendingStageId;
+        public string LastClearedStageId => _lastClearedStageId;
+        public long LastClearElapsedMilliseconds => _lastClearElapsedMs;
 
         private void Awake()
         {
@@ -51,6 +55,11 @@ namespace ShadowGarden.Presentation
                 : new SaveService(new MemoryProgressSaveRepository(), new MemoryUiPreferencesRepository());
             _save.LoadAll();
 
+            if (!string.IsNullOrWhiteSpace(_save.Progress?.lastStageId))
+            {
+                _pendingStageId = _save.Progress.lastStageId;
+            }
+
             gameplayHost?.Bind(this);
             flowScreens?.Bind(this, screenRouter);
         }
@@ -58,6 +67,7 @@ namespace ShadowGarden.Presentation
         private void Start()
         {
             BootInitialState();
+            flowScreens?.RefreshTitleBranch();
             flowScreens?.RefreshWorldMapUnlock();
         }
 
@@ -68,6 +78,7 @@ namespace ShadowGarden.Presentation
                 _flow.StateChanged -= OnStateChanged;
             }
 
+            flowScreens?.UnbindInput();
             _input?.Dispose();
         }
 
@@ -93,6 +104,11 @@ namespace ShadowGarden.Presentation
             if (host != null)
             {
                 gameplayHost = host;
+            }
+
+            if (!string.IsNullOrWhiteSpace(_save.Progress?.lastStageId))
+            {
+                _pendingStageId = _save.Progress.lastStageId;
             }
 
             gameplayHost?.Bind(this);
@@ -129,6 +145,14 @@ namespace ShadowGarden.Presentation
             }
         }
 
+        /// <summary>Wipe progress and begin a fresh Opening → WorldMap run.</summary>
+        public void StartNewGameFromTitle()
+        {
+            _save?.ResetProgressForNewGame();
+            _pendingStageId = "1-1";
+            RequestState(AppState.Opening);
+        }
+
         public void CompleteOpening()
         {
             _save?.MarkOpeningSeen();
@@ -146,11 +170,17 @@ namespace ShadowGarden.Presentation
             RequestState(AppState.Playing);
         }
 
-        public void NotifyGameOver() => RequestState(AppState.GameOver);
+        public void NotifyGameOver()
+        {
+            _save?.RecordStageFailed(_pendingStageId);
+            RequestState(AppState.GameOver);
+        }
 
         public void NotifyCleared(string stageId, long elapsedMilliseconds)
         {
-            _save?.RecordStageCleared(stageId, elapsedMilliseconds);
+            _lastClearedStageId = string.IsNullOrWhiteSpace(stageId) ? _pendingStageId : stageId.Trim();
+            _lastClearElapsedMs = elapsedMilliseconds;
+            _save?.RecordStageCleared(_lastClearedStageId, elapsedMilliseconds);
             RequestState(AppState.Cleared);
         }
 
@@ -164,6 +194,64 @@ namespace ShadowGarden.Presentation
         public void EnterEndingFromCleared() => RequestState(AppState.Ending);
 
         public void FinishEnding() => RequestState(AppState.Title);
+
+        public void FinishEndingToWorldMap() => RequestState(AppState.WorldMap);
+
+        public string ResolveNextStageAfterClear()
+        {
+            return _save?.ResolveNextStageId(stageCatalog, _lastClearedStageId ?? _pendingStageId);
+        }
+
+        public bool IsFinalStageClear() =>
+            string.Equals(_lastClearedStageId ?? _pendingStageId, "3-4", System.StringComparison.Ordinal);
+
+        public bool IsWorldFinaleClear()
+        {
+            var id = _lastClearedStageId ?? _pendingStageId;
+            return id != null && id.EndsWith("-4") && !IsFinalStageClear();
+        }
+
+        public void ContinueAfterClear()
+        {
+            if (IsFinalStageClear())
+            {
+                EnterEndingFromCleared();
+                return;
+            }
+
+            var next = ResolveNextStageAfterClear();
+            if (!string.IsNullOrWhiteSpace(next))
+            {
+                StartStage(next);
+                return;
+            }
+
+            ReturnToWorldMap();
+        }
+
+        public void ApplyModalSelection(string optionId)
+        {
+            if (string.IsNullOrWhiteSpace(optionId))
+            {
+                return;
+            }
+
+            switch (optionId)
+            {
+                case "retry":
+                    RetryFromGameOver();
+                    break;
+                case "worldmap":
+                    ReturnToWorldMap();
+                    break;
+                case "next":
+                    ContinueAfterClear();
+                    break;
+                case "ending":
+                    EnterEndingFromCleared();
+                    break;
+            }
+        }
 
         private void BootInitialState()
         {
@@ -195,15 +283,25 @@ namespace ShadowGarden.Presentation
             }
             else if (from == AppState.Playing)
             {
-                if (to == AppState.WorldMap || to == AppState.Title)
+                if (to == AppState.WorldMap || to == AppState.Title || to == AppState.Ending)
                 {
                     gameplayHost?.StopPlay();
                 }
             }
 
+            if (to == AppState.Title)
+            {
+                flowScreens?.RefreshTitleBranch();
+            }
+
             if (to == AppState.WorldMap)
             {
                 flowScreens?.RefreshWorldMapUnlock();
+            }
+
+            if (to == AppState.GameOver || to == AppState.Cleared || to == AppState.Ending)
+            {
+                flowScreens?.RefreshModalForState(to);
             }
         }
 

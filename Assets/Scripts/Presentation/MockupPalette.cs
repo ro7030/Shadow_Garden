@@ -68,7 +68,7 @@ namespace ShadowGarden.Presentation
         public static string WorldName(string stageId) => stageId switch
         {
             "TF-1" => "시험의 정원",
-            "1-1" or "1-2" or "1-4" => "노을 과수원",
+            "1-1" or "1-2" or "1-3" or "1-4" => "노을 과수원",
             "2-1" or "2-2" or "2-3" or "2-4" => "바람종 협곡",
             "3-1" or "3-2" or "3-3" or "3-4" => "별뿌리 온실",
             _ => "테스트 필드"
