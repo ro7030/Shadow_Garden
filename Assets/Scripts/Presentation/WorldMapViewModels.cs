@@ -113,7 +113,7 @@ namespace ShadowGarden.Presentation
                     var icon = string.Empty;
                     if (completed)
                     {
-                        icon = goal == ClearGoalType.NightFlower ? "꽃" : "문";
+                        icon = goal == ClearGoalType.NightFlower ? "❀" : "⌂";
                     }
 
                     var hasBest = progress.ToBestClearDictionary().ContainsKey(id);

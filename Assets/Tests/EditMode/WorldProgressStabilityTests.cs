@@ -45,8 +45,8 @@ namespace ShadowGarden.Tests.EditMode
                 Assert.AreEqual(3, vm.Worlds.Count);
                 Assert.AreEqual(12, vm.FlatNodes.Count);
                 Assert.IsTrue(vm.Worlds[2].Unlocked);
-                Assert.AreEqual("꽃", vm.FlatNodes[11].CompletionIcon);
-                Assert.AreEqual("문", vm.FlatNodes[0].CompletionIcon);
+                Assert.AreEqual("❀", vm.FlatNodes[11].CompletionIcon);
+                Assert.AreEqual("⌂", vm.FlatNodes[0].CompletionIcon);
 
                 var modal = ModalViewModel.CreateCleared(hasNextStage: true, isFinalStage: true);
                 Assert.AreEqual("ending", modal.Selected.Id);
@@ -106,7 +106,7 @@ namespace ShadowGarden.Tests.EditMode
                 progress.lastStageId = "1-1";
                 var vm = WorldMapViewModel.Build(catalog, progress, "1-1");
                 Assert.AreEqual(ProgressTimeFormat.Incomplete, vm.FlatNodes[0].TimeLabel);
-                Assert.AreEqual("문", vm.FlatNodes[0].CompletionIcon);
+                Assert.AreEqual("⌂", vm.FlatNodes[0].CompletionIcon);
             }
             finally
             {
