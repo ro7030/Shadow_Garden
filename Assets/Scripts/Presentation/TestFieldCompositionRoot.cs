@@ -79,7 +79,6 @@ namespace ShadowGarden.Presentation
                 BeginStage(StageDefinitionFactory.CreateFromAsset(stages[_stageIndex]));
             }
 
-            FrameCamera();
             _started = true;
         }
 
@@ -136,6 +135,7 @@ namespace ShadowGarden.Presentation
             playHudPresenter.Bind(definition);
             boardPresenter.Build(definition);
             playerPresenter.EnsureVisual();
+            FrameCamera(definition.BoardSize);
             _input?.EnableGameplay(true);
             _input?.CancelLockAndBuffer();
             RefreshView();
@@ -165,10 +165,9 @@ namespace ShadowGarden.Presentation
 
         private static StageDefinition[] AllGrayboxes() => new[]
         {
-            GrayboxStages.CreateTF_1(),
             GrayboxStages.Create1_1(),
-            GrayboxStages.Create1_2(),
             GrayboxStages.Create1_4(),
+            GrayboxStages.Create2_2(),
             GrayboxStages.Create3_4()
         };
 
@@ -386,27 +385,17 @@ namespace ShadowGarden.Presentation
         {
             return stage.StageId switch
             {
-                "TF-1" => "×2는 심연입니다. 삼각형 태양등으로 중첩을 푼 뒤, 남색 단일 길로 출구에 가세요.",
                 "1-1" => "태양등 위에서 Q/E로 방향을 바꾼 뒤, 남색 그림자 길로 출구에 가세요.",
-                "1-2" => "낮은 기둥은 2칸, 높은 기둥은 4칸 그림자를 만듭니다.",
-                "1-4" => "×2 자주색 칸은 위험합니다. 안전 지형으로 우회해 밤꽃에 도달하세요.",
-                "3-4" => "네 채널을 조합해 밤꽃까지 이어지는 길을 만드세요.",
+                "1-4" => "두 채널을 맞춰 ×2를 피하고 밤꽃에 도달하세요.",
+                "2-2" => "원·삼각·별 세 구간을 순서대로 이으세요.",
+                "3-4" => "네 채널을 조율해 18×8 온실의 밤꽃까지 가세요. ×2는 심연입니다.",
                 _ => "남색 길은 안전, ×2와 빈 절벽은 위험합니다."
             };
         }
 
-        private void FrameCamera()
+        private void FrameCamera(GridSize boardSize)
         {
-            var camera = Camera.main;
-            if (camera == null)
-            {
-                return;
-            }
-
-            camera.orthographic = true;
-            camera.orthographicSize = 4.6f;
-            var center = GridWorld.BoardCenter(GridSize.Board12x6);
-            camera.transform.position = new Vector3(center.x, center.y - 0.15f, -10f);
+            BoardCameraFitter.Apply(Camera.main, boardSize);
         }
 
         private static void ApplyCameraLook()

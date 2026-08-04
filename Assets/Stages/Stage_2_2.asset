@@ -10,12 +10,14 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e9ad4c2c11f514739aa5a4c4dd11a7f0, type: 3}
-  m_Name: Stage_TF_1
+  m_Name: Stage_2_2
   m_EditorClassIdentifier: ShadowGarden.Infrastructure::ShadowGarden.Infrastructure.StageDefinitionAsset
-  stageId: TF-1
+  stageId: 2-2
+  boardWidth: 12
+  boardHeight: 6
   playerStart:
-    x: 1
-    y: 2
+    x: 0
+    y: 3
   safeCells:
   - x: 0
     y: 2
@@ -23,57 +25,79 @@ MonoBehaviour:
     y: 2
   - x: 2
     y: 2
-  - x: 2
-    y: 1
   - x: 3
-    y: 1
+    y: 2
   - x: 4
-    y: 1
-  - x: 1
-    y: 1
-  - x: 1
-    y: 0
+    y: 2
   - x: 0
-    y: 0
-  - x: 2
-    y: 0
-  - x: 1
     y: 3
   - x: 1
-    y: 4
+    y: 3
+  - x: 2
+    y: 3
+  - x: 3
+    y: 3
+  - x: 4
+    y: 3
   - x: 0
     y: 4
+  - x: 1
+    y: 4
   - x: 2
+    y: 4
+  - x: 3
+    y: 4
+  - x: 4
     y: 4
   lamps:
   - position:
       x: 1
       y: 2
     channel: 0
+    initialDirection: 0
+  - position:
+      x: 2
+      y: 3
+    channel: 1
     initialDirection: 1
   - position:
       x: 1
       y: 4
-    channel: 1
-    initialDirection: 0
+    channel: 2
+    initialDirection: 3
   pillars:
   - position:
       x: 3
-      y: 2
+      y: 1
     channel: 0
+    height: 3
+  - position:
+      x: 7
+      y: 0
+    channel: 1
+    height: 3
+  - position:
+      x: 6
+      y: 4
+    channel: 2
     height: 4
   - position:
       x: 3
-      y: 0
+      y: 5
     channel: 0
-    height: 2
+    height: 3
   - position:
-      x: 5
-      y: 4
+      x: 10
+      y: 0
     channel: 1
     height: 3
+  - position:
+      x: 8
+      y: 5
+    channel: 2
+    height: 4
   clearGoalType: 0
   goalPosition:
-    x: 8
-    y: 2
+    x: 11
+    y: 4
   timeLimitSeconds: 120

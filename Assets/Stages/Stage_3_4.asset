@@ -13,35 +13,59 @@ MonoBehaviour:
   m_Name: Stage_3_4
   m_EditorClassIdentifier: ShadowGarden.Infrastructure::ShadowGarden.Infrastructure.StageDefinitionAsset
   stageId: 3-4
+  boardWidth: 18
+  boardHeight: 8
   playerStart:
-    x: 1
-    y: 0
+    x: 0
+    y: 3
   safeCells:
   - x: 0
-    y: 0
-  - x: 1
-    y: 0
-  - x: 2
-    y: 0
-  - x: 1
-    y: 1
-  - x: 1
     y: 2
   - x: 1
+    y: 2
+  - x: 2
+    y: 2
+  - x: 3
+    y: 2
+  - x: 4
+    y: 2
+  - x: 5
+    y: 2
+  - x: 14
+    y: 2
+  - x: 15
+    y: 2
+  - x: 16
+    y: 2
+  - x: 17
+    y: 2
+  - x: 0
     y: 3
   - x: 1
+    y: 3
+  - x: 2
+    y: 3
+  - x: 3
+    y: 3
+  - x: 4
+    y: 3
+  - x: 5
+    y: 3
+  - x: 0
     y: 4
   - x: 1
+    y: 4
+  - x: 2
+    y: 4
+  - x: 3
+    y: 4
+  - x: 4
+    y: 4
+  - x: 5
+    y: 4
+  - x: 0
     y: 5
-  - x: 0
-    y: 2
-  - x: 2
-    y: 2
-  - x: 0
-    y: 4
-  - x: 2
-    y: 4
-  - x: 0
+  - x: 1
     y: 5
   - x: 2
     y: 5
@@ -51,62 +75,80 @@ MonoBehaviour:
     y: 5
   - x: 5
     y: 5
-  - x: 6
-    y: 5
-  - x: 7
-    y: 5
-  - x: 8
-    y: 5
-  - x: 9
-    y: 5
-  - x: 10
-    y: 5
-  - x: 11
-    y: 5
   lamps:
   - position:
       x: 1
-      y: 0
-    channel: 0
-    initialDirection: 1
-  - position:
-      x: 1
       y: 2
+    channel: 0
+    initialDirection: 3
+  - position:
+      x: 2
+      y: 3
     channel: 1
-    initialDirection: 1
+    initialDirection: 0
   - position:
       x: 1
       y: 4
     channel: 2
-    initialDirection: 1
+    initialDirection: 3
   - position:
-      x: 1
-      y: 5
+      x: 3
+      y: 4
     channel: 3
-    initialDirection: 1
+    initialDirection: 2
   pillars:
   - position:
-      x: 3
-      y: 0
+      x: 4
+      y: 1
     channel: 0
-    height: 2
+    height: 4
   - position:
-      x: 3
-      y: 2
+      x: 9
+      y: 0
     channel: 1
-    height: 3
-  - position:
-      x: 3
-      y: 4
-    channel: 2
     height: 4
   - position:
       x: 8
+      y: 5
+    channel: 2
+    height: 4
+  - position:
+      x: 13
+      y: 6
+    channel: 3
+    height: 4
+  - position:
+      x: 4
+      y: 7
+    channel: 0
+    height: 3
+  - position:
+      x: 14
+      y: 3
+    channel: 0
+    height: 3
+  - position:
+      x: 16
+      y: 0
+    channel: 1
+    height: 4
+  - position:
+      x: 6
       y: 2
+    channel: 1
+    height: 2
+  - position:
+      x: 11
+      y: 7
+    channel: 2
+    height: 4
+  - position:
+      x: 7
+      y: 6
     channel: 3
     height: 3
   clearGoalType: 1
   goalPosition:
-    x: 11
-    y: 5
+    x: 17
+    y: 2
   timeLimitSeconds: 150

@@ -13,26 +13,38 @@ MonoBehaviour:
   m_Name: Stage_1_1
   m_EditorClassIdentifier: ShadowGarden.Infrastructure::ShadowGarden.Infrastructure.StageDefinitionAsset
   stageId: 1-1
+  boardWidth: 12
+  boardHeight: 6
   playerStart:
     x: 1
-    y: 2
+    y: 3
   safeCells:
   - x: 0
-    y: 2
+    y: 3
   - x: 1
-    y: 2
+    y: 3
   - x: 2
-    y: 2
-  - x: 2
-    y: 1
+    y: 3
   - x: 3
-    y: 1
+    y: 3
   - x: 4
-    y: 1
+    y: 3
+  - x: 6
+    y: 3
+  - x: 7
+    y: 3
+  - x: 8
+    y: 3
+  - x: 9
+    y: 3
+  - x: 10
+    y: 3
+  - x: 11
+    y: 3
   lamps:
   - position:
-      x: 1
-      y: 2
+      x: 2
+      y: 3
     channel: 0
     initialDirection: 0
   pillars:
@@ -43,6 +55,6 @@ MonoBehaviour:
     height: 3
   clearGoalType: 0
   goalPosition:
-    x: 7
-    y: 2
+    x: 11
+    y: 3
   timeLimitSeconds: 120

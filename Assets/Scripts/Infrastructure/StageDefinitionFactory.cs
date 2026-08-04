@@ -26,6 +26,8 @@ namespace ShadowGarden.Infrastructure
         public static void ApplyGraybox(StageDefinitionAsset asset, StageDefinition definition)
         {
             asset.stageId = definition.StageId;
+            asset.boardWidth = definition.BoardSize.Width;
+            asset.boardHeight = definition.BoardSize.Height;
             asset.playerStart = new GridPositionAuthoring
             {
                 x = definition.PlayerStart.X,

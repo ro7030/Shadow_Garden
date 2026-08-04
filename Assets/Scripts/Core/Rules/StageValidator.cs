@@ -32,9 +32,11 @@ namespace ShadowGarden.Core
                 issues.Add(new ValidationIssue("stageId", "StageId is required."));
             }
 
-            if (stage.BoardSize.Width != 12 || stage.BoardSize.Height != 6)
+            if (!GridSize.IsSupported(stage.BoardSize))
             {
-                issues.Add(new ValidationIssue("boardSize", "Board size must be 12x6."));
+                issues.Add(new ValidationIssue(
+                    "boardSize",
+                    $"Board size {stage.BoardSize} is not in SupportedBoardSizes."));
             }
 
             if (!stage.IsInBounds(stage.PlayerStart) || stage.IsPillar(stage.PlayerStart))

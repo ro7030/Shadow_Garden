@@ -3,6 +3,7 @@
     "rootNamespace": "ShadowGarden.Tests.EditMode",
     "references": [
         "ShadowGarden.Core",
+        "ShadowGarden.Presentation",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

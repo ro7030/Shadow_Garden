@@ -280,10 +280,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: ShadowGarden.Presentation::ShadowGarden.Presentation.TestFieldCompositionRoot
   inputActions: {fileID: -944628639613478452, guid: bae3561b2124f4fe2a88343d37303af7, type: 3}
   stages:
-  - {fileID: 11400000, guid: 7f3a1c9e2b8d4e6a9c0d1e2f3a4b5c6d, type: 2}
   - {fileID: 11400000, guid: 12565bf25d1a44f92a57607e6ed755c7, type: 2}
-  - {fileID: 11400000, guid: bf03ef7361759430498345368acde805, type: 2}
   - {fileID: 11400000, guid: 1c16cc561df64479c960bb63b50e1982, type: 2}
+  - {fileID: 11400000, guid: 817d7ba3649704c798d96bbe3f0b67d0, type: 2}
   - {fileID: 11400000, guid: 8824a17fdcb0b4b9790e2e15b34a0037, type: 2}
   boardPresenter: {fileID: 1447811228}
   playerPresenter: {fileID: 1447811227}

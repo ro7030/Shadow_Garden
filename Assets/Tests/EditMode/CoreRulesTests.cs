@@ -227,104 +227,89 @@ namespace ShadowGarden.Tests.EditMode
         }
     }
 
+    public class SupportedBoardSizeTests
+    {
+        [TestCase(12, 6)]
+        [TestCase(14, 7)]
+        [TestCase(16, 7)]
+        [TestCase(16, 8)]
+        [TestCase(18, 8)]
+        public void Supported_Sizes_Are_Accepted(int width, int height)
+        {
+            Assert.IsTrue(GridSize.IsSupported(width, height));
+        }
+
+        [TestCase(13, 6)]
+        [TestCase(18, 9)]
+        [TestCase(0, 6)]
+        public void Unsupported_Sizes_Are_Rejected(int width, int height)
+        {
+            Assert.IsFalse(GridSize.IsSupported(width, height));
+            var stage = new StageDefinition(
+                "bad",
+                new GridSize(width, height),
+                new GridPosition(0, 0),
+                new[] { new GridPosition(0, 0) },
+                new[] { new LampDefinition(new GridPosition(0, 0), ChannelId.Circle, CardinalDirection.East) },
+                System.Array.Empty<PillarDefinition>(),
+                ClearGoalType.ExitDoor,
+                new GridPosition(1, 0),
+                120);
+            Assert.IsNotEmpty(StageValidator.Validate(stage));
+        }
+
+        [Test]
+        public void PathFinder_MaxStates_For_3_4_Is_36864()
+        {
+            var stage = GrayboxStages.Create3_4();
+            Assert.AreEqual(18, stage.BoardSize.Width);
+            Assert.AreEqual(8, stage.BoardSize.Height);
+            Assert.AreEqual(4, stage.Lamps.Count);
+            Assert.AreEqual(36864, SafetyPathFinder.MaxStatesFor(stage));
+        }
+    }
+
     public class GrayboxStageTests
     {
-        [TestCase("TF-1")]
         [TestCase("1-1")]
-        [TestCase("1-2")]
         [TestCase("1-4")]
+        [TestCase("2-2")]
         [TestCase("3-4")]
-        public void Graybox_Stages_Are_Valid(string id)
+        public void Canonical_Stages_Are_Valid(string id)
         {
             var issues = StageValidator.Validate(Get(id));
             Assert.IsEmpty(issues, string.Join(" | ", issues));
         }
 
-        [TestCase("TF-1")]
         [TestCase("1-1")]
-        [TestCase("1-2")]
         [TestCase("1-4")]
+        [TestCase("2-2")]
         [TestCase("3-4")]
-        public void Graybox_Stages_Have_Safe_Solution(string id)
+        public void Canonical_Stages_Have_Safe_Solution(string id)
         {
             Assert.IsTrue(SafetyPathFinder.HasSafeSolution(Get(id)), id);
         }
 
         [Test]
-        public void Stage_TF_1_Initial_Shortcut_Is_Intentional_Overlap()
+        public void Stage_1_1_Initial_Shadows_Match_Design()
         {
-            var stage = GrayboxStages.CreateTF_1();
+            var stage = GrayboxStages.Create1_1();
             var shadows = StageCommands.CurrentShadows(stage, stage.CreateInitialRuntimeState());
-
-            Assert.AreEqual(2, shadows.GetShadowCount(new GridPosition(5, 2)));
-            Assert.AreEqual(1, shadows.GetShadowCount(new GridPosition(4, 2)));
-            Assert.AreEqual(1, shadows.GetShadowCount(new GridPosition(6, 2)));
-            Assert.AreEqual(0, shadows.GetShadowCount(new GridPosition(6, 0)), "Low shadow ends before cliff");
-            Assert.AreEqual(CellKind.Cliff, CellClassifier.Classify(stage, shadows, new GridPosition(6, 0)));
+            Assert.AreEqual(1, shadows.GetShadowCount(new GridPosition(3, 0)));
+            Assert.AreEqual(1, shadows.GetShadowCount(new GridPosition(3, 1)));
+            Assert.AreEqual(0, shadows.GetShadowCount(new GridPosition(5, 2)));
         }
 
         [Test]
-        public void Stage_TF_1_Entering_Overlap_Causes_Abyss_Death()
-        {
-            var stage = GrayboxStages.CreateTF_1();
-            var state = StageCommands.Start(stage).NextState;
-            // Approach from safe detour onto the fake shortcut cell that is ×2.
-            // Grid North decreases Y, so (4,1) -> South reaches (4,2).
-            state = state.WithPlayer(new GridPosition(4, 1), StagePhase.Playing);
-            state = StageCommands.TryMove(stage, state, CardinalDirection.South).NextState; // (4,2) single
-            var death = StageCommands.TryMove(stage, state, CardinalDirection.East);
-            Assert.IsTrue(death.Move.HasValue);
-            Assert.AreEqual(MoveOutcome.OverlapDeath, death.Move.Value.Outcome);
-
-            var sawGameOver = false;
-            foreach (var e in death.Events)
-            {
-                if (e.Type == StageEventType.GameOverStarted)
-                {
-                    sawGameOver = true;
-                    Assert.AreEqual(GameOverCause.OverlappingShadows, e.GameOverCause);
-                }
-            }
-
-            Assert.IsTrue(sawGameOver);
-        }
-
-        [Test]
-        public void Stage_TF_1_Rotating_Triangle_Clears_Overlap_Bridge()
-        {
-            var stage = GrayboxStages.CreateTF_1();
-            var state = StageCommands.Start(stage).NextState;
-            state = state.WithPlayer(new GridPosition(1, 4), StagePhase.Playing);
-            state = StageCommands.TryRotate(stage, state, 1).NextState; // North -> East
-            var shadows = StageCommands.CurrentShadows(stage, state);
-
-            Assert.AreEqual(1, shadows.GetShadowCount(new GridPosition(5, 2)));
-            Assert.AreEqual(CellKind.SingleShadow, CellClassifier.Classify(stage, shadows, new GridPosition(5, 2)));
-        }
-
-        [Test]
-        public void Restart_Restores_Initial_State()
+        public void Stage_1_1_One_Rotation_Opens_East_Bridge()
         {
             var stage = GrayboxStages.Create1_1();
-            var started = StageCommands.Start(stage);
-            var rotated = StageCommands.TryRotate(stage, started.NextState, 1);
-            var restarted = StageCommands.Restart(stage);
-
-            Assert.AreEqual(started.NextState.PlayerPosition, restarted.NextState.PlayerPosition);
-            Assert.AreEqual(
-                started.NextState.GetDirection(ChannelId.Circle),
-                restarted.NextState.GetDirection(ChannelId.Circle));
-            Assert.AreEqual(stage.TimeLimitMilliseconds, restarted.NextState.RemainingMilliseconds);
-        }
-
-        [Test]
-        public void Stage_1_1_One_Rotation_Opens_Three_Shadow_Cells()
-        {
-            var stage = GrayboxStages.Create1_1();
-            var state = StageCommands.Start(stage).NextState;
+            var state = StageCommands.Start(stage).NextState
+                .WithPlayer(new GridPosition(2, 3), StagePhase.Playing);
             state = StageCommands.TryRotate(stage, state, 1).NextState;
             var shadows = StageCommands.CurrentShadows(stage, state);
 
+            Assert.AreEqual(CardinalDirection.East, state.GetDirection(ChannelId.Circle));
             Assert.AreEqual(1, shadows.GetShadowCount(new GridPosition(4, 2)));
             Assert.AreEqual(1, shadows.GetShadowCount(new GridPosition(5, 2)));
             Assert.AreEqual(1, shadows.GetShadowCount(new GridPosition(6, 2)));
@@ -332,26 +317,50 @@ namespace ShadowGarden.Tests.EditMode
         }
 
         [Test]
-        public void Stage_1_2_Low_And_High_Lengths_Differ()
+        public void Stage_1_4_Initial_Single_Shadows_Match_Design()
         {
-            var stage = GrayboxStages.Create1_2();
+            var stage = GrayboxStages.Create1_4();
             var shadows = StageCommands.CurrentShadows(stage, stage.CreateInitialRuntimeState());
+            Assert.AreEqual(1, shadows.GetShadowCount(new GridPosition(0, 0)));
+            Assert.AreEqual(1, shadows.GetShadowCount(new GridPosition(2, 0)));
+            Assert.AreEqual(1, shadows.GetShadowCount(new GridPosition(11, 2)));
+            Assert.AreEqual(0, shadows.GetShadowCount(new GridPosition(5, 2)));
+        }
 
-            Assert.AreEqual(1, shadows.GetShadowCount(new GridPosition(4, 1)));
-            Assert.AreEqual(1, shadows.GetShadowCount(new GridPosition(5, 1)));
-            Assert.AreEqual(0, shadows.GetShadowCount(new GridPosition(6, 1)));
+        [Test]
+        public void Stage_3_4_Initial_Overlap_At_7_7()
+        {
+            var stage = GrayboxStages.Create3_4();
+            Assert.AreEqual(GridSize.Board18x8, stage.BoardSize);
+            var shadows = StageCommands.CurrentShadows(stage, stage.CreateInitialRuntimeState());
+            Assert.AreEqual(2, shadows.GetShadowCount(new GridPosition(7, 7)));
+            Assert.AreEqual(CellKind.OverlapHazard, CellClassifier.Classify(stage, shadows, new GridPosition(7, 7)));
+        }
 
-            Assert.AreEqual(1, shadows.GetShadowCount(new GridPosition(4, 4)));
-            Assert.AreEqual(1, shadows.GetShadowCount(new GridPosition(7, 4)));
-            Assert.AreEqual(0, shadows.GetShadowCount(new GridPosition(8, 4)));
+        [Test]
+        public void Restart_Restores_Initial_State()
+        {
+            var stage = GrayboxStages.Create1_1();
+            var started = StageCommands.Start(stage);
+            var onLamp = started.NextState.WithPlayer(new GridPosition(2, 3), StagePhase.Playing);
+            var rotated = StageCommands.TryRotate(stage, onLamp, 1);
+            var restarted = StageCommands.Restart(stage);
+
+            Assert.AreEqual(started.NextState.PlayerPosition, restarted.NextState.PlayerPosition);
+            Assert.AreEqual(
+                started.NextState.GetDirection(ChannelId.Circle),
+                restarted.NextState.GetDirection(ChannelId.Circle));
+            Assert.AreEqual(stage.TimeLimitMilliseconds, restarted.NextState.RemainingMilliseconds);
+            Assert.AreNotEqual(
+                rotated.NextState.GetDirection(ChannelId.Circle),
+                restarted.NextState.GetDirection(ChannelId.Circle));
         }
 
         private static StageDefinition Get(string id) => id switch
         {
-            "TF-1" => GrayboxStages.CreateTF_1(),
             "1-1" => GrayboxStages.Create1_1(),
-            "1-2" => GrayboxStages.Create1_2(),
             "1-4" => GrayboxStages.Create1_4(),
+            "2-2" => GrayboxStages.Create2_2(),
             "3-4" => GrayboxStages.Create3_4(),
             _ => throw new AssertionException("Unknown stage")
         };

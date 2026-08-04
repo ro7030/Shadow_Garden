@@ -276,8 +276,26 @@ namespace ShadowGarden.Core
             }
         }
 
-        public static bool HasSafeSolution(StageDefinition stage, int maxStates = 20000)
+        public static int MaxStatesFor(StageDefinition stage)
         {
+            var lampCount = stage.Lamps.Count;
+            var limit = stage.BoardSize.CellCount;
+            for (var i = 0; i < lampCount; i++)
+            {
+                limit *= 4;
+            }
+
+            const int hardCap = 36864;
+            return limit > hardCap ? hardCap : limit;
+        }
+
+        public static bool HasSafeSolution(StageDefinition stage, int maxStates = -1)
+        {
+            if (maxStates < 0)
+            {
+                maxStates = MaxStatesFor(stage);
+            }
+
             var initial = stage.CreateInitialRuntimeState();
             var queue = new Queue<StageRuntimeState>();
             var visited = new HashSet<Key>();

@@ -34,6 +34,8 @@ namespace ShadowGarden.Infrastructure
     public sealed class StageDefinitionAsset : ScriptableObject
     {
         public string stageId = "1-1";
+        public int boardWidth = 12;
+        public int boardHeight = 6;
         public GridPositionAuthoring playerStart;
         public List<GridPositionAuthoring> safeCells = new List<GridPositionAuthoring>();
         public List<LampAuthoring> lamps = new List<LampAuthoring>();
@@ -66,7 +68,7 @@ namespace ShadowGarden.Infrastructure
 
             return new StageDefinition(
                 stageId,
-                GridSize.Board12x6,
+                new GridSize(boardWidth, boardHeight),
                 playerStart.ToCore(),
                 safe,
                 lampDefs,
