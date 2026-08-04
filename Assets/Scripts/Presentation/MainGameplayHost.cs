@@ -39,6 +39,14 @@ namespace ShadowGarden.Presentation
         public MainPlayHud PlayHud => playHud;
 
         private bool _externalPause;
+        private bool _reduceMotion;
+
+        public void ApplyReduceMotion(bool enabled)
+        {
+            _reduceMotion = enabled;
+            boardPresenter?.SetReduceMotion(enabled);
+            playHud?.ApplyPreferences();
+        }
 
         public void Bind(MainCompositionRoot main)
         {
@@ -100,6 +108,7 @@ namespace ShadowGarden.Presentation
             playHud.Bind(_main);
             playHud.SetVisible(true);
             playHud.Render(definition, _session.State);
+            ApplyReduceMotion(_main?.Save?.Preferences != null && _main.Save.Preferences.reduceMotion);
             BoardCameraFitter.Apply(Camera.main, definition.BoardSize);
             ApplyCameraLook();
 
@@ -342,26 +351,43 @@ namespace ShadowGarden.Presentation
 
             _sequencing = true;
             _main?.Input?.EnableGameplay(false);
-            var door = boardPresenter.PlayDoorOpen(_definition, PresentationTiming.DoorOpenSeconds);
-            if (door != null)
+
+            if (_definition.ClearGoalType == ClearGoalType.NightFlower)
             {
-                yield return door;
+                var bloom = _reduceMotion
+                    ? PresentationTiming.NightFlowerBloomSeconds * 0.35f
+                    : PresentationTiming.NightFlowerBloomSeconds;
+                yield return new WaitForSecondsRealtime(bloom);
             }
             else
             {
-                yield return new WaitForSecondsRealtime(PresentationTiming.DoorOpenSeconds);
+                var door = boardPresenter.PlayDoorOpen(_definition, PresentationTiming.DoorOpenSeconds);
+                if (door != null)
+                {
+                    yield return door;
+                }
+                else
+                {
+                    yield return new WaitForSecondsRealtime(PresentationTiming.DoorOpenSeconds);
+                }
+
+                var pass = playerPresenter.AnimatePassThroughDoor(
+                    _definition.GoalPosition,
+                    PresentationTiming.GoalPassSeconds);
+                if (pass != null)
+                {
+                    yield return pass;
+                }
+                else
+                {
+                    yield return new WaitForSecondsRealtime(PresentationTiming.GoalPassSeconds);
+                }
             }
 
-            var pass = playerPresenter.AnimatePassThroughDoor(
-                _definition.GoalPosition,
-                PresentationTiming.GoalPassSeconds);
-            if (pass != null)
+            if (_main != null && _main.IsWorldFinaleClear())
             {
-                yield return pass;
-            }
-            else
-            {
-                yield return new WaitForSecondsRealtime(PresentationTiming.GoalPassSeconds);
+                yield return new WaitForSecondsRealtime(
+                    _reduceMotion ? 0.35f : PresentationTiming.WorldUnlockBeatSeconds);
             }
 
             _main?.NotifyCleared(_stageId, _clearElapsedMs);
@@ -377,15 +403,24 @@ namespace ShadowGarden.Presentation
 
             _sequencing = true;
             _main?.Input?.EnableGameplay(false);
-            if (cause == GameOverCause.CliffFall || cause == GameOverCause.OverlappingShadows)
+            var pos = _session.State.PlayerPosition;
+            Coroutine motion = null;
+            switch (cause)
             {
-                var fall = playerPresenter.AnimateCliffFall(
-                    _session.State.PlayerPosition,
-                    PresentationTiming.CliffFallSeconds);
-                if (fall != null)
-                {
-                    yield return fall;
-                }
+                case GameOverCause.OverlappingShadows:
+                    motion = playerPresenter.AnimateOverlapSink(pos, PresentationTiming.OverlapSinkSeconds);
+                    break;
+                case GameOverCause.CliffFall:
+                    motion = playerPresenter.AnimateCliffFall(pos, PresentationTiming.CliffFallSeconds);
+                    break;
+                case GameOverCause.TimeExpired:
+                    motion = playerPresenter.AnimateTimeVacuum(pos, PresentationTiming.TimeVacuumSeconds);
+                    break;
+            }
+
+            if (motion != null)
+            {
+                yield return motion;
             }
             else
             {

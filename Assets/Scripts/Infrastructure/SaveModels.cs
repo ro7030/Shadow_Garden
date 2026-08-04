@@ -75,8 +75,8 @@ namespace ShadowGarden.Infrastructure
         public const int CurrentVersion = 1;
 
         public int version = CurrentVersion;
-        public float bgmVolume = 1f;
-        public float sfxVolume = 1f;
+        public float bgmVolume = 0.7f;
+        public float sfxVolume = 0.8f;
         public bool reduceMotion;
         public bool openingSeen;
 

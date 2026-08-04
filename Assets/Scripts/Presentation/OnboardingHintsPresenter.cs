@@ -63,6 +63,15 @@ namespace ShadowGarden.Presentation
                 return;
             }
 
+            // UI/UX §25–26: 상황형 안내는 1월드만. 2월드 이후는 소멸.
+            if (!IsWorldOne(stage.StageId))
+            {
+                SetWasd(false);
+                SetQe(false);
+                SetR(false);
+                return;
+            }
+
             if (!_wasdDismissed)
             {
                 SetWasd(true);
@@ -73,10 +82,21 @@ namespace ShadowGarden.Presentation
                 SetWasd(false);
             }
 
-            var onLamp = stage.TryGetLampAt(state.PlayerPosition, out _);
+            var onLamp = stage.TryGetLampAt(state.PlayerPosition, out var lamp);
             if (!_qeDismissed && onLamp)
             {
                 SetQe(true);
+                if (qeRoot != null)
+                {
+                    var label = qeRoot.GetComponentInChildren<TextMeshProUGUI>();
+                    if (label != null)
+                    {
+                        var glyph = MockupPalette.ChannelGlyph(lamp.Channel);
+                        label.text = $"Q / E  {glyph}";
+                        UiTypography.Apply(label, bold: true);
+                    }
+                }
+
                 qeRoot.position = playerVisual.position + new Vector3(0f, 1.15f, -0.2f);
             }
             else
@@ -93,6 +113,11 @@ namespace ShadowGarden.Presentation
             {
                 SetR(false);
             }
+        }
+
+        private static bool IsWorldOne(string stageId)
+        {
+            return !string.IsNullOrWhiteSpace(stageId) && stageId.StartsWith("1-");
         }
 
         private void EnsureVisuals()

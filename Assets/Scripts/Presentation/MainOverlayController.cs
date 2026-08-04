@@ -1,4 +1,3 @@
-using System;
 using ShadowGarden.Runtime;
 using TMPro;
 using UnityEngine;
@@ -18,9 +17,11 @@ namespace ShadowGarden.Presentation
         private GameObject _settingsPanel;
         private GameObject _focusPanel;
         private TextMeshProUGUI _focusLabel;
+        private TextMeshProUGUI _controlsLabel;
         private Slider _bgmSlider;
         private Slider _sfxSlider;
         private Toggle _reduceMotionToggle;
+        private Toggle _fullscreenToggle;
         private bool _paused;
         private bool _settingsOpen;
         private bool _awaitingFocusClick;
@@ -164,11 +165,7 @@ namespace ShadowGarden.Presentation
             UiFactory.CreateButton(panel.transform, "ResumeButton", "계속하기",
                 new Vector2(0f, 60f), () => ClosePause(true));
             UiFactory.CreateButton(panel.transform, "RetryButton", "다시 도전",
-                new Vector2(0f, 0f), () =>
-                {
-                    ClosePause(false);
-                    _main?.RetryFromGameOver();
-                });
+                new Vector2(0f, 0f), () => _main?.RetryFromPause());
             UiFactory.CreateButton(panel.transform, "WorldMapButton", "레벨 선택",
                 new Vector2(0f, -60f), () =>
                 {
@@ -183,34 +180,40 @@ namespace ShadowGarden.Presentation
         private GameObject BuildSettings()
         {
             var panel = UiFactory.CreatePanel(_root.transform, "SettingsPanel", UiTheme.Panel,
-                new Vector2(560f, 480f), Vector2.zero).gameObject;
+                new Vector2(640f, 620f), Vector2.zero).gameObject;
             UiFactory.CreateLabel(panel.transform, "Title", "설정",
-                new Vector2(0f, 180f), new Vector2(480f, 48f), UiTheme.TitleFont * 0.55f, true);
+                new Vector2(0f, 250f), new Vector2(520f, 48f), UiTheme.TitleFont * 0.55f, true);
 
             UiFactory.CreateLabel(panel.transform, "BgmLabel", "BGM",
-                new Vector2(-180f, 90f), new Vector2(120f, 32f), UiTheme.BodyFontMin + 4, false,
+                new Vector2(-200f, 170f), new Vector2(120f, 32f), UiTheme.BodyFontMin + 4, false,
                 TextAlignmentOptions.MidlineLeft);
-            _bgmSlider = CreateSlider(panel.transform, "BgmSlider", new Vector2(40f, 90f));
+            _bgmSlider = CreateSlider(panel.transform, "BgmSlider", new Vector2(40f, 170f));
+            _bgmSlider.value = 0.7f;
 
             UiFactory.CreateLabel(panel.transform, "SfxLabel", "효과음",
-                new Vector2(-180f, 30f), new Vector2(120f, 32f), UiTheme.BodyFontMin + 4, false,
+                new Vector2(-200f, 110f), new Vector2(120f, 32f), UiTheme.BodyFontMin + 4, false,
                 TextAlignmentOptions.MidlineLeft);
-            _sfxSlider = CreateSlider(panel.transform, "SfxSlider", new Vector2(40f, 30f));
+            _sfxSlider = CreateSlider(panel.transform, "SfxSlider", new Vector2(40f, 110f));
+            _sfxSlider.value = 0.8f;
 
-            var toggleGo = new GameObject("ReduceMotionToggle", typeof(RectTransform), typeof(Toggle), typeof(Image));
-            toggleGo.transform.SetParent(panel.transform, false);
-            var trt = toggleGo.GetComponent<RectTransform>();
-            trt.anchorMin = trt.anchorMax = new Vector2(0.5f, 0.5f);
-            trt.sizeDelta = new Vector2(36f, 36f);
-            trt.anchoredPosition = new Vector2(-200f, -40f);
-            toggleGo.GetComponent<Image>().color = UiTheme.Navy;
-            _reduceMotionToggle = toggleGo.GetComponent<Toggle>();
-            UiFactory.CreateLabel(panel.transform, "ReduceMotionLabel", "모션 완화 (점멸·맥동 제거)",
-                new Vector2(40f, -40f), new Vector2(360f, 36f), UiTheme.BodyFontMin + 2, false,
+            _fullscreenToggle = CreateToggle(panel.transform, "FullscreenToggle",
+                new Vector2(-220f, 40f));
+            UiFactory.CreateLabel(panel.transform, "FullscreenLabel", "전체화면",
+                new Vector2(20f, 40f), new Vector2(360f, 44f), UiTheme.BodyFontMin + 2, false,
                 TextAlignmentOptions.MidlineLeft);
+
+            _reduceMotionToggle = CreateToggle(panel.transform, "ReduceMotionToggle",
+                new Vector2(-220f, -20f));
+            UiFactory.CreateLabel(panel.transform, "ReduceMotionLabel", "모션 완화 (점멸·맥동 제거)",
+                new Vector2(40f, -20f), new Vector2(400f, 44f), UiTheme.BodyFontMin + 2, false,
+                TextAlignmentOptions.MidlineLeft);
+
+            _controlsLabel = UiFactory.CreateLabel(panel.transform, "ControlsLabel",
+                "조작 확인\nWASD 이동 · Q/E 태양등 회전 · R 다시 도전\n방향키·Enter 메뉴 · 일시정지는 화면 버튼",
+                new Vector2(0f, -110f), new Vector2(560f, 100f), UiTheme.BodyFontMin + 2, false);
 
             UiFactory.CreateButton(panel.transform, "ReplayOpeningButton", "오프닝 다시 보기",
-                new Vector2(0f, -110f), () =>
+                new Vector2(0f, -190f), () =>
                 {
                     PersistSettings();
                     HideAll();
@@ -219,7 +222,7 @@ namespace ShadowGarden.Presentation
                     _main?.ReplayOpening();
                 });
             UiFactory.CreateButton(panel.transform, "CloseButton", "닫기",
-                new Vector2(0f, -180f), CloseSettings);
+                new Vector2(0f, -260f), CloseSettings);
             return panel;
         }
 
@@ -228,11 +231,23 @@ namespace ShadowGarden.Presentation
             var panel = UiFactory.CreatePanel(_root.transform, "FocusPanel", UiTheme.Panel,
                 new Vector2(560f, 220f), Vector2.zero).gameObject;
             _focusLabel = UiFactory.CreateLabel(panel.transform, "Body",
-                "브라우저 포커스가 잠시 떠났습니다.\n클릭하면 안전하게 이어서 플레이합니다.",
+                "게임 화면을 클릭해 계속합니다.\n포커스가 돌아오면 안전하게 이어서 플레이합니다.",
                 new Vector2(0f, 20f), new Vector2(500f, 100f), UiTheme.SubtitleFont, false);
             UiFactory.CreateButton(panel.transform, "ResumeClickButton", "클릭하여 복귀",
                 new Vector2(0f, -60f), TryDismissFocusOverlay);
             return panel;
+        }
+
+        private static Toggle CreateToggle(Transform parent, string name, Vector2 anchored)
+        {
+            var toggleGo = new GameObject(name, typeof(RectTransform), typeof(Toggle), typeof(Image));
+            toggleGo.transform.SetParent(parent, false);
+            var trt = toggleGo.GetComponent<RectTransform>();
+            trt.anchorMin = trt.anchorMax = new Vector2(0.5f, 0.5f);
+            trt.sizeDelta = new Vector2(UiTheme.ButtonMinHeight, UiTheme.ButtonMinHeight);
+            trt.anchoredPosition = anchored;
+            toggleGo.GetComponent<Image>().color = UiTheme.Navy;
+            return toggleGo.GetComponent<Toggle>();
         }
 
         private static Slider CreateSlider(Transform parent, string name, Vector2 anchored)
@@ -279,6 +294,11 @@ namespace ShadowGarden.Presentation
             {
                 _reduceMotionToggle.SetIsOnWithoutNotify(prefs.reduceMotion);
             }
+
+            if (_fullscreenToggle != null)
+            {
+                _fullscreenToggle.SetIsOnWithoutNotify(Screen.fullScreen);
+            }
         }
 
         private void PersistSettings()
@@ -302,6 +322,11 @@ namespace ShadowGarden.Presentation
             if (_reduceMotionToggle != null)
             {
                 prefs.reduceMotion = _reduceMotionToggle.isOn;
+            }
+
+            if (_fullscreenToggle != null)
+            {
+                Screen.fullScreen = _fullscreenToggle.isOn;
             }
 
             _main.Save.TrySavePreferences();

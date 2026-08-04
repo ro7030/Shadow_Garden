@@ -22,6 +22,9 @@ namespace ShadowGarden.Presentation
         private Sprite _softQuad;
         private readonly System.Collections.Generic.List<(Transform t, Vector3 baseScale)> _pulseTargets =
             new System.Collections.Generic.List<(Transform, Vector3)>();
+        private bool _reduceMotion;
+
+        public void SetReduceMotion(bool enabled) => _reduceMotion = enabled;
 
         public void Build(StageDefinition stage)
         {
@@ -188,6 +191,20 @@ namespace ShadowGarden.Presentation
         {
             if (_pulseTargets.Count == 0)
             {
+                return;
+            }
+
+            if (_reduceMotion)
+            {
+                for (var i = 0; i < _pulseTargets.Count; i++)
+                {
+                    var (t, baseScale) = _pulseTargets[i];
+                    if (t != null)
+                    {
+                        t.localScale = baseScale;
+                    }
+                }
+
                 return;
             }
 

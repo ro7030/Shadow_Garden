@@ -28,7 +28,10 @@ namespace ShadowGarden.Presentation
         private Button _openingSkip;
         private TextMeshProUGUI _openingBody;
         private TextMeshProUGUI _openingPageLabel;
+        private Image _openingHoldFill;
         private int _openingPage;
+        private float _openingHoldSeconds;
+        private bool _openingHoldActive;
         private Button _endingWorldMap;
         private Button _endingTitle;
         private TextMeshProUGUI _gameOverReason;
@@ -88,7 +91,7 @@ namespace ShadowGarden.Presentation
                 var label = _titleContinue.GetComponentInChildren<TextMeshProUGUI>(true);
                 if (label != null)
                 {
-                    label.text = canContinue ? "정원으로 돌아가기" : "시작";
+                    label.text = canContinue ? "정원으로 돌아가기" : "정원 들어가기";
                     UiTypography.Apply(label, bold: true);
                 }
             }
@@ -175,6 +178,7 @@ namespace ShadowGarden.Presentation
                 {
                     var id = main.LastClearedStageId ?? main.PendingStageId;
                     var time = ProgressTimeFormat.FormatBestClear((long?)main.LastClearElapsedMilliseconds);
+                    var best = ProgressTimeFormat.FormatBestClear(main.Save?.Progress, id);
                     var nightFlower = false;
                     if (main.Catalog != null &&
                         main.Catalog.TryGetById(id, out var clearedAsset) &&
@@ -183,21 +187,30 @@ namespace ShadowGarden.Presentation
                         nightFlower = clearedAsset.clearGoalType == ClearGoalType.NightFlower;
                     }
 
+                    var bestLine = best == ProgressTimeFormat.Incomplete
+                        ? string.Empty
+                        : $"\nBEST {best}";
+                    var isNewBest = best != ProgressTimeFormat.Incomplete &&
+                                    best == time;
+                    var newBadge = isNewBest ? "  NEW" : string.Empty;
+
                     if (isFinal)
                     {
-                        _clearedDetail.text = $"3-4 밤꽃 완료  ·  {time}\n세 정원이 모두 되살아났습니다.";
+                        _clearedDetail.text =
+                            $"3-4 밤꽃 완료  ·  {time}{newBadge}{bestLine}\n세 정원이 모두 되살아났습니다.";
                     }
                     else if (nextWorld)
                     {
-                        _clearedDetail.text = $"{id} 밤꽃 완료  ·  {time}\n다음 월드가 해금되었습니다.";
+                        _clearedDetail.text =
+                            $"{id} 밤꽃 완료  ·  {time}{newBadge}{bestLine}\n다음 월드가 해금되었습니다.";
                     }
                     else if (nightFlower)
                     {
-                        _clearedDetail.text = $"{id} 밤꽃 완료  ·  {time}";
+                        _clearedDetail.text = $"{id} 밤꽃 완료  ·  {time}{newBadge}{bestLine}";
                     }
                     else
                     {
-                        _clearedDetail.text = $"{id} 출구 완료  ·  {time}";
+                        _clearedDetail.text = $"{id} 출구 완료  ·  {time}{newBadge}{bestLine}";
                     }
 
                     UiTypography.Apply(_clearedDetail, bold: false);
@@ -234,6 +247,67 @@ namespace ShadowGarden.Presentation
             if (_navigateCooldown > 0f)
             {
                 _navigateCooldown -= Time.unscaledDeltaTime;
+            }
+
+            TickOpeningHold();
+            TickGameOverResetShortcut();
+        }
+
+        private void TickGameOverResetShortcut()
+        {
+            if (main == null || main.CurrentState != AppState.GameOver)
+            {
+                return;
+            }
+
+            var keyboard = UnityEngine.InputSystem.Keyboard.current;
+            if (keyboard != null && keyboard.rKey.wasPressedThisFrame)
+            {
+                main.RetryFromGameOver();
+            }
+        }
+
+        private void TickOpeningHold()
+        {
+            if (main == null || main.CurrentState != AppState.Opening)
+            {
+                _openingHoldSeconds = 0f;
+                _openingHoldActive = false;
+                if (_openingHoldFill != null)
+                {
+                    _openingHoldFill.fillAmount = 0f;
+                }
+
+                return;
+            }
+
+            var keyboard = UnityEngine.InputSystem.Keyboard.current;
+            var mouse = UnityEngine.InputSystem.Mouse.current;
+            var holding =
+                _openingHoldActive ||
+                (keyboard != null && (keyboard.spaceKey.isPressed || keyboard.enterKey.isPressed)) ||
+                (mouse != null && mouse.leftButton.isPressed);
+
+            if (!holding)
+            {
+                _openingHoldSeconds = Mathf.MoveTowards(_openingHoldSeconds, 0f, Time.unscaledDeltaTime * 2f);
+            }
+            else
+            {
+                _openingHoldSeconds += Time.unscaledDeltaTime;
+            }
+
+            if (_openingHoldFill != null)
+            {
+                _openingHoldFill.fillAmount = Mathf.Clamp01(
+                    _openingHoldSeconds / PresentationTiming.OpeningSkipHoldSeconds);
+            }
+
+            if (_openingHoldSeconds >= PresentationTiming.OpeningSkipHoldSeconds)
+            {
+                _openingHoldSeconds = 0f;
+                _openingHoldActive = false;
+                main.CompleteOpening();
             }
         }
 
@@ -374,7 +448,7 @@ namespace ShadowGarden.Presentation
             SetClick(_titleReplayOpening, () => main?.ReplayOpening());
             SetClick(_titleSettings, () => main?.OpenSettingsFromTitle());
             SetClick(_openingContinue, AdvanceOpeningOrComplete);
-            SetClick(_openingSkip, () => main?.CompleteOpening());
+            SetClick(_openingSkip, () => { _openingHoldActive = true; });
             SetClick(_endingWorldMap, () => main?.FinishEndingToWorldMap());
             SetClick(_endingTitle, () => main?.FinishEnding());
         }
@@ -388,6 +462,8 @@ namespace ShadowGarden.Presentation
 
             EnsureOpening(router.OpeningRoot);
             _openingPage = 0;
+            _openingHoldSeconds = 0f;
+            _openingHoldActive = false;
             ApplyOpeningPage();
             SelectButton(_openingContinue);
         }
@@ -452,8 +528,8 @@ namespace ShadowGarden.Presentation
             SetRootLabel(root, "그림자 정원");
             _titleConceptLabel = EnsureLabel(root.transform, "ConceptLabel",
                 "빛과 그림자로 잠든 정원을 되살린다", new Vector2(0f, 100f), 22f);
-            _titleContinue = EnsureButton(root.transform, "ContinueButton", "시작", new Vector2(0f, 20f));
-            _titleNewGame = EnsureButton(root.transform, "NewGameButton", "새로 시작", new Vector2(0f, -50f));
+            _titleContinue = EnsureButton(root.transform, "ContinueButton", "정원 들어가기", new Vector2(0f, 20f));
+            _titleNewGame = EnsureButton(root.transform, "NewGameButton", "새로 선택", new Vector2(0f, -50f));
             _titleReplayOpening = EnsureButton(root.transform, "ReplayOpeningButton", "오프닝 다시 보기",
                 new Vector2(0f, -120f));
             _titleSettings = EnsureButton(root.transform, "SettingsButton", "설정", new Vector2(0f, -190f));
@@ -475,12 +551,35 @@ namespace ShadowGarden.Presentation
 
             SetRootLabel(root, "오프닝");
             _openingPageLabel = EnsureLabel(root.transform, "OpeningPageLabel", "1 / 6",
-                new Vector2(0f, 160f), 18f);
+                new Vector2(0f, 200f), 18f);
             _openingBody = EnsureLabel(root.transform, "OpeningBody",
-                "정원이 숨을 고른다.", new Vector2(0f, 20f), 24f);
+                "정원이 숨을 고른다.", new Vector2(0f, 40f), 24f);
             _openingBody.rectTransform.sizeDelta = new Vector2(720f, 220f);
-            _openingContinue = EnsureButton(root.transform, "ContinueButton", "다음", new Vector2(0f, -160f));
-            _openingSkip = EnsureButton(root.transform, "SkipButton", "건너뛰기", new Vector2(0f, -230f));
+            _openingContinue = EnsureButton(root.transform, "ContinueButton", "다음", new Vector2(0f, -140f));
+            _openingSkip = EnsureButton(root.transform, "SkipButton", "홀드하여 건너뛰기", new Vector2(0f, -210f));
+            var skipRt = _openingSkip != null ? _openingSkip.GetComponent<RectTransform>() : null;
+            if (skipRt != null)
+            {
+                skipRt.sizeDelta = new Vector2(360f, Mathf.Max(56f, UiTheme.ButtonMinHeight));
+            }
+
+            if (_openingHoldFill == null)
+            {
+                var gauge = new GameObject("SkipHoldGauge", typeof(RectTransform), typeof(Image));
+                gauge.transform.SetParent(root.transform, false);
+                var grt = gauge.GetComponent<RectTransform>();
+                grt.anchorMin = grt.anchorMax = new Vector2(0.5f, 0.5f);
+                grt.sizeDelta = new Vector2(56f, 56f);
+                grt.anchoredPosition = new Vector2(0f, -270f);
+                _openingHoldFill = gauge.GetComponent<Image>();
+                _openingHoldFill.color = UiTheme.Mint;
+                _openingHoldFill.type = Image.Type.Filled;
+                _openingHoldFill.fillMethod = Image.FillMethod.Radial360;
+                _openingHoldFill.fillOrigin = (int)Image.Origin360.Top;
+                _openingHoldFill.fillClockwise = true;
+                _openingHoldFill.fillAmount = 0f;
+                _openingHoldFill.raycastTarget = false;
+            }
         }
 
         private void EnsureWorldMap(GameObject root)
@@ -576,7 +675,7 @@ namespace ShadowGarden.Presentation
             _endingCredits = EnsureLabel(
                 root.transform,
                 "CreditsLabel",
-                "제작 · Shadow Garden\nCore · Runtime · Presentation\nFont · Noto Sans KR (SIL OFL 1.1)",
+                "제작 정보\nShadow Garden\nFont · Noto Sans KR (SIL OFL 1.1)\nCore · Runtime · Presentation · Infrastructure",
                 new Vector2(0f, -40f),
                 18f);
             _endingCredits.rectTransform.sizeDelta = new Vector2(720f, 100f);
@@ -638,9 +737,20 @@ namespace ShadowGarden.Presentation
             rt.sizeDelta = new Vector2(300f, 360f);
             rt.anchoredPosition = pos;
             var image = go.GetComponent<Image>();
+            var accent = WorldAccent(world.WorldNumber);
             image.color = world.Unlocked
-                ? new Color(0.14f, 0.2f, 0.3f, 0.95f)
+                ? new Color(accent.r * 0.35f, accent.g * 0.35f, accent.b * 0.4f, 0.95f)
                 : new Color(0.08f, 0.09f, 0.12f, 0.9f);
+
+            var band = new GameObject("AccentBand", typeof(RectTransform), typeof(Image));
+            band.transform.SetParent(go.transform, false);
+            var brt = band.GetComponent<RectTransform>();
+            brt.anchorMin = new Vector2(0f, 1f);
+            brt.anchorMax = new Vector2(1f, 1f);
+            brt.pivot = new Vector2(0.5f, 1f);
+            brt.sizeDelta = new Vector2(0f, 10f);
+            brt.anchoredPosition = Vector2.zero;
+            band.GetComponent<Image>().color = world.Unlocked ? accent : UiTheme.Disabled;
 
             var title = EnsureLabel(
                 go.transform,
@@ -663,6 +773,13 @@ namespace ShadowGarden.Presentation
 
             return go.transform;
         }
+
+        private static Color WorldAccent(int worldNumber) => worldNumber switch
+        {
+            2 => new Color(0.35f, 0.72f, 0.68f, 1f), // 바람종 협곡 — 청록
+            3 => new Color(0.62f, 0.48f, 0.88f, 1f), // 별뿌리 온실 — 보라
+            _ => new Color(0.83f, 0.55f, 0.28f, 1f)  // 노을 과수원 — 황토
+        };
 
         private static Button CreateStageNodeButton(Transform parent, StageNodeViewModel node, Vector2 pos)
         {

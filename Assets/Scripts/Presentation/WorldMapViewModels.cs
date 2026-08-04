@@ -110,11 +110,10 @@ namespace ShadowGarden.Presentation
                                     progress.completedStageIds.Contains(id);
                     var goal = asset != null ? asset.clearGoalType
                         : (slot == 4 ? ClearGoalType.NightFlower : ClearGoalType.ExitDoor);
-                    var icon = string.Empty;
-                    if (completed)
-                    {
-                        icon = goal == ClearGoalType.NightFlower ? "❀" : "⌂";
-                    }
+                    // 해금된 노드는 목표 문양(⌂/❀)을 항상 표시. 완료 시 BEST만 추가.
+                    var icon = unlocked
+                        ? (goal == ClearGoalType.NightFlower ? "❀" : "⌂")
+                        : string.Empty;
 
                     var hasBest = progress.ToBestClearDictionary().ContainsKey(id);
                     var node = new StageNodeViewModel

@@ -4,7 +4,7 @@ using UnityEngine;
 namespace ShadowGarden.Presentation
 {
     /// <summary>
-    /// Cloaked Moa silhouette with optional move / pass / fall presentation tweens.
+    /// Cloaked Moa silhouette with move / pass / fall / sink / vacuum presentation tweens.
     /// Does not recompute Core rules — only follows positions supplied by the host.
     /// </summary>
     public sealed class PlayerPresenter : MonoBehaviour
@@ -14,6 +14,7 @@ namespace ShadowGarden.Presentation
         private Coroutine _motion;
 
         public Transform Visual => playerVisual;
+        public bool IsMotionPlaying => _motion != null;
 
         public void EnsureVisual()
         {
@@ -88,13 +89,65 @@ namespace ShadowGarden.Presentation
         {
             EnsureVisual();
             StopMotion();
+            _motion = StartCoroutine(CliffFallRoutine(cell, seconds));
+            return _motion;
+        }
+
+        public Coroutine AnimateOverlapSink(ShadowGarden.Core.GridPosition cell, float seconds)
+        {
+            EnsureVisual();
+            StopMotion();
             var start = GridWorld.ToWorld(cell, -0.38f);
-            var end = start + new Vector3(0f, -1.4f, 0.2f);
+            var end = start + new Vector3(0f, -0.85f, 0.1f);
             _motion = StartCoroutine(LerpWorld(start, end, Mathf.Max(0.01f, seconds), shrink: true));
             return _motion;
         }
 
+        public Coroutine AnimateTimeVacuum(ShadowGarden.Core.GridPosition cell, float seconds)
+        {
+            EnsureVisual();
+            StopMotion();
+            _motion = StartCoroutine(VacuumRoutine(cell, seconds));
+            return _motion;
+        }
+
+        private IEnumerator CliffFallRoutine(ShadowGarden.Core.GridPosition cell, float fallSeconds)
+        {
+            var start = GridWorld.ToWorld(cell, -0.38f);
+            var approach = start + new Vector3(0f, -PresentationTiming.CliffApproachCells * GridWorld.CellSize, 0f);
+            yield return AnimateLerp(start, approach, 0.12f, shrink: false);
+            var end = approach + new Vector3(0f, -1.4f, 0.2f);
+            yield return AnimateLerp(approach, end, Mathf.Max(0.01f, fallSeconds), shrink: true);
+            _motion = null;
+        }
+
+        private IEnumerator VacuumRoutine(ShadowGarden.Core.GridPosition cell, float seconds)
+        {
+            var start = GridWorld.ToWorld(cell, -0.38f);
+            playerVisual.position = start;
+            var elapsed = 0f;
+            while (elapsed < seconds)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                var t = Mathf.Clamp01(elapsed / seconds);
+                var spin = t * 360f * 1.5f;
+                playerVisual.localRotation = Quaternion.Euler(0f, 0f, spin);
+                playerVisual.localScale = Vector3.Lerp(Vector3.one, Vector3.one * 0.05f, t * t);
+                playerVisual.position = start + new Vector3(Mathf.Sin(t * 12f) * 0.08f, -t * 0.4f, 0f);
+                yield return null;
+            }
+
+            playerVisual.localScale = Vector3.one * 0.05f;
+            _motion = null;
+        }
+
         private IEnumerator LerpWorld(Vector3 from, Vector3 to, float seconds, bool shrink = false)
+        {
+            yield return AnimateLerp(from, to, seconds, shrink);
+            _motion = null;
+        }
+
+        private IEnumerator AnimateLerp(Vector3 from, Vector3 to, float seconds, bool shrink)
         {
             var elapsed = 0f;
             playerVisual.position = from;
@@ -118,8 +171,6 @@ namespace ShadowGarden.Presentation
             {
                 playerVisual.localScale = Vector3.one * 0.15f;
             }
-
-            _motion = null;
         }
 
         private void StopMotion()
@@ -133,6 +184,7 @@ namespace ShadowGarden.Presentation
             if (playerVisual != null)
             {
                 playerVisual.localScale = Vector3.one;
+                playerVisual.localRotation = Quaternion.identity;
             }
         }
 

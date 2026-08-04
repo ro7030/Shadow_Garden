@@ -153,6 +153,63 @@ namespace ShadowGarden.Tests.PlayMode
             Assert.IsNotNull(GameObject.Find("ReplayOpeningButton"));
         }
 
+        [UnityTest]
+        public IEnumerator Title_Uses_Garden_Enter_Copy()
+        {
+            yield return LoadMain();
+            var root = Object.FindFirstObjectByType<MainCompositionRoot>();
+            root.Save.ResetProgressForNewGame();
+            root.Save.Preferences.openingSeen = false;
+            var screens = Object.FindFirstObjectByType<MainFlowScreens>();
+            screens.RefreshTitleBranch();
+            yield return null;
+            var continueBtn = GameObject.Find("ContinueButton");
+            Assert.IsNotNull(continueBtn);
+            var label = continueBtn.GetComponentInChildren<TextMeshProUGUI>(true);
+            Assert.IsNotNull(label);
+            StringAssert.Contains("정원 들어가기", label.text);
+        }
+
+        [UnityTest]
+        public IEnumerator Pause_Retry_Restarts_Without_Leaving_Playing()
+        {
+            yield return LoadMain();
+            var root = Object.FindFirstObjectByType<MainCompositionRoot>();
+            root.Save.Preferences.openingSeen = true;
+            root.ContinueFromTitle();
+            yield return null;
+            root.StartStage("1-1");
+            yield return null;
+            yield return null;
+            Assert.AreEqual(AppState.Playing, root.CurrentState);
+            root.OpenPause();
+            yield return null;
+            root.RetryFromPause();
+            yield return null;
+            yield return null;
+            Assert.AreEqual(AppState.Playing, root.CurrentState);
+            Assert.IsFalse(root.Overlay.IsPauseOpen);
+            Assert.AreEqual("1-1", root.Gameplay.Definition.StageId);
+        }
+
+        [UnityTest]
+        public IEnumerator Hud_Timer_Is_Top_Center_Anchored()
+        {
+            yield return LoadMain();
+            var root = Object.FindFirstObjectByType<MainCompositionRoot>();
+            root.Save.Preferences.openingSeen = true;
+            root.ContinueFromTitle();
+            yield return null;
+            root.StartStage("1-1");
+            yield return null;
+            yield return null;
+            var timer = GameObject.Find("TimerLabel");
+            Assert.IsNotNull(timer);
+            var rt = timer.GetComponent<RectTransform>();
+            Assert.AreEqual(0.5f, rt.anchorMin.x, 0.01f);
+            Assert.AreEqual(1f, rt.anchorMin.y, 0.01f);
+        }
+
         private static IEnumerator Capture(string name)
         {
             var dir = System.IO.Path.Combine(Application.dataPath, "Screenshots", "Stage5");

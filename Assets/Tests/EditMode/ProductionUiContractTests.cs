@@ -20,6 +20,31 @@ namespace ShadowGarden.Tests.EditMode
         }
 
         [Test]
+        public void Preference_Defaults_Match_Ux_Mix()
+        {
+            var prefs = ShadowGarden.Infrastructure.UiPreferencesData.CreateDefault();
+            Assert.AreEqual(0.7f, prefs.bgmVolume, 0.001f);
+            Assert.AreEqual(0.8f, prefs.sfxVolume, 0.001f);
+        }
+
+        [Test]
+        public void Presentation_Timings_Match_Ux_Contracts()
+        {
+            Assert.AreEqual(1f, PresentationTiming.OpeningSkipHoldSeconds, 0.01f);
+            Assert.AreEqual(1.5f, PresentationTiming.NightFlowerBloomSeconds, 0.01f);
+            Assert.AreEqual(0.55f, PresentationTiming.OverlapSinkSeconds, 0.01f);
+            Assert.AreEqual(0.65f, PresentationTiming.TimeVacuumSeconds, 0.01f);
+            Assert.AreEqual(0.45f, PresentationTiming.DoorOpenSeconds, 0.01f);
+            Assert.AreEqual(0.35f, PresentationTiming.GoalPassSeconds, 0.01f);
+        }
+
+        [Test]
+        public void MainCompositionRoot_Exposes_Pause_Retry()
+        {
+            Assert.IsNotNull(typeof(MainCompositionRoot).GetMethod("RetryFromPause"));
+        }
+
+        [Test]
         public void ConfigureCanvas_Applies_Overlay_Scaler()
         {
             var go = new GameObject("Canvas");

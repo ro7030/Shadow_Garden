@@ -166,9 +166,10 @@ namespace ShadowGarden.Presentation
 
         public void StartNewGameFromTitle()
         {
+            // UI/UX §15: 「새로 선택」 → WorldMap 첫 해금 노드 (오프닝 강제 재생 아님).
             _save?.ResetProgressForNewGame();
             _pendingStageId = "1-1";
-            RequestState(AppState.Opening);
+            RequestState(AppState.WorldMap);
         }
 
         public void CompleteOpening()
@@ -211,6 +212,8 @@ namespace ShadowGarden.Presentation
         public void ApplyUiPreferences()
         {
             gameplayHost?.PlayHud?.ApplyPreferences();
+            gameplayHost?.ApplyReduceMotion(
+                _save?.Preferences != null && _save.Preferences.reduceMotion);
         }
 
         public void NotifyFocusLost()
@@ -250,6 +253,26 @@ namespace ShadowGarden.Presentation
         }
 
         public void RetryFromGameOver() => RequestState(AppState.Playing);
+
+        /// <summary>
+        /// Pause menu retry: stay in Playing and rebuild the active stage.
+        /// Must not call RequestState(Playing) — Playing→Playing is rejected.
+        /// </summary>
+        public void RetryFromPause()
+        {
+            if (CurrentState != AppState.Playing)
+            {
+                RetryFromGameOver();
+                return;
+            }
+
+            overlay?.ClosePause(false);
+            _playPaused = false;
+            gameplayHost?.SetExternalPause(false);
+            gameplayHost?.RestartActiveStage();
+            _input?.EnableGameplay(true);
+            _input?.ApplyForAppState(AppState.Playing);
+        }
 
         public void ReturnToWorldMap() => RequestState(AppState.WorldMap);
 
