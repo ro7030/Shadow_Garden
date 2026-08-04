@@ -30,6 +30,13 @@ namespace ShadowGarden.Infrastructure
         public PillarHeight height = PillarHeight.Medium;
     }
 
+    [Serializable]
+    public class RecordedRotateAuthoring
+    {
+        public ChannelId channel = ChannelId.Circle;
+        public int quarterTurnsClockwise = 1;
+    }
+
     [CreateAssetMenu(menuName = "ShadowGarden/Stage Definition", fileName = "Stage_")]
     public sealed class StageDefinitionAsset : ScriptableObject
     {
@@ -43,6 +50,11 @@ namespace ShadowGarden.Infrastructure
         public ClearGoalType clearGoalType = ClearGoalType.ExitDoor;
         public GridPositionAuthoring goalPosition;
         public int timeLimitSeconds = 120;
+
+        [Header("Recorded primary solution (level design)")]
+        public List<GridPositionAuthoring> recordedSolutionPath = new List<GridPositionAuthoring>();
+        public List<RecordedRotateAuthoring> recordedRotates = new List<RecordedRotateAuthoring>();
+        public int documentedMinRotates;
 
         public StageDefinition ToDefinition()
         {
@@ -76,6 +88,24 @@ namespace ShadowGarden.Infrastructure
                 clearGoalType,
                 goalPosition.ToCore(),
                 timeLimitSeconds);
+        }
+
+        public RecordedSolution ToRecordedSolution()
+        {
+            var path = new GridPosition[recordedSolutionPath.Count];
+            for (var i = 0; i < recordedSolutionPath.Count; i++)
+            {
+                path[i] = recordedSolutionPath[i].ToCore();
+            }
+
+            var rotates = new RecordedRotate[recordedRotates.Count];
+            for (var i = 0; i < recordedRotates.Count; i++)
+            {
+                var r = recordedRotates[i];
+                rotates[i] = new RecordedRotate(r.channel, r.quarterTurnsClockwise);
+            }
+
+            return new RecordedSolution(path, rotates, documentedMinRotates, Array.Empty<RecordedSolution>());
         }
 
         private void OnValidate()

@@ -289,17 +289,57 @@ namespace ShadowGarden.Core
             return limit > hardCap ? hardCap : limit;
         }
 
-        public static bool HasSafeSolution(StageDefinition stage, int maxStates = -1)
+        public static bool HasSafeSolution(StageDefinition stage, int maxStates = -1) =>
+            TryFindMinimalSolution(stage, out _, maxStates);
+
+        public sealed class FoundSolution
         {
+            public int RotateCount { get; }
+            public int MoveCount { get; }
+            public int ExploredStates { get; }
+            public IReadOnlyList<string> Commands { get; }
+
+            public FoundSolution(int rotateCount, int moveCount, int exploredStates, IReadOnlyList<string> commands)
+            {
+                RotateCount = rotateCount;
+                MoveCount = moveCount;
+                ExploredStates = exploredStates;
+                Commands = commands;
+            }
+        }
+
+        private sealed class Node
+        {
+            public StageRuntimeState State;
+            public int RotateCount;
+            public int MoveCount;
+            public Node Parent;
+            public string Command;
+        }
+
+        /// <summary>
+        /// BFS preferring fewer rotates, then fewer moves. Returns false if no safe clear within maxStates.
+        /// </summary>
+        public static bool TryFindMinimalSolution(
+            StageDefinition stage,
+            out FoundSolution solution,
+            int maxStates = -1)
+        {
+            solution = null;
             if (maxStates < 0)
             {
                 maxStates = MaxStatesFor(stage);
             }
 
-            var initial = stage.CreateInitialRuntimeState();
-            var queue = new Queue<StageRuntimeState>();
+            var initial = stage.CreateInitialRuntimeState().WithPhase(StagePhase.Playing);
+            var buckets = new Queue<Node>[64];
+            for (var i = 0; i < buckets.Length; i++)
+            {
+                buckets[i] = new Queue<Node>();
+            }
+
             var visited = new HashSet<Key>();
-            queue.Enqueue(initial);
+            buckets[0].Enqueue(new Node { State = initial, RotateCount = 0, MoveCount = 0 });
             visited.Add(MakeKey(stage, initial));
 
             var dirs = new[]
@@ -311,50 +351,102 @@ namespace ShadowGarden.Core
             };
 
             var explored = 0;
-            while (queue.Count > 0 && explored < maxStates)
+            for (var rotateLayer = 0; rotateLayer < buckets.Length && explored < maxStates; rotateLayer++)
             {
-                explored++;
-                var state = queue.Dequeue();
-                var shadows = StageCommands.CurrentShadows(stage, state);
-
-                foreach (var direction in dirs)
+                var queue = buckets[rotateLayer];
+                while (queue.Count > 0 && explored < maxStates)
                 {
-                    var move = MoveResolver.ResolveMove(stage, state, shadows, direction);
-                    if (move.Outcome == MoveOutcome.ExitReached ||
-                        move.Outcome == MoveOutcome.NightFlowerReached)
+                    explored++;
+                    var node = queue.Dequeue();
+                    var state = node.State;
+                    var shadows = StageCommands.CurrentShadows(stage, state);
+
+                    foreach (var direction in dirs)
                     {
-                        return true;
+                        var move = MoveResolver.ResolveMove(stage, state, shadows, direction);
+                        if (move.Outcome == MoveOutcome.ExitReached ||
+                            move.Outcome == MoveOutcome.NightFlowerReached)
+                        {
+                            solution = BuildFound(node, $"M({direction})", node.RotateCount, node.MoveCount + 1, explored);
+                            return true;
+                        }
+
+                        if (move.Outcome != MoveOutcome.Moved)
+                        {
+                            continue;
+                        }
+
+                        var nextState = state.WithPlayer(move.TargetPosition, StagePhase.Playing);
+                        var key = MakeKey(stage, nextState);
+                        if (!visited.Add(key))
+                        {
+                            continue;
+                        }
+
+                        queue.Enqueue(new Node
+                        {
+                            State = nextState,
+                            RotateCount = node.RotateCount,
+                            MoveCount = node.MoveCount + 1,
+                            Parent = node,
+                            Command = $"M({direction})"
+                        });
                     }
 
-                    if (move.Outcome != MoveOutcome.Moved)
+                    if (!stage.TryGetLampAt(state.PlayerPosition, out var lamp))
                     {
                         continue;
                     }
 
-                    var next = state.WithPlayer(move.TargetPosition, StagePhase.Playing);
-                    var key = MakeKey(stage, next);
-                    if (visited.Add(key))
-                    {
-                        queue.Enqueue(next);
-                    }
-                }
-
-                if (stage.TryGetLampAt(state.PlayerPosition, out var lamp))
-                {
                     foreach (var turn in new[] { -1, 1 })
                     {
-                        var rotated = DirectionUtility.Rotate(state.GetDirection(lamp.Channel), turn);
-                        var next = state.WithDirection(lamp.Channel, rotated, StagePhase.Playing);
-                        var key = MakeKey(stage, next);
-                        if (visited.Add(key))
+                        var nextRotate = node.RotateCount + 1;
+                        if (nextRotate >= buckets.Length)
                         {
-                            queue.Enqueue(next);
+                            continue;
                         }
+
+                        var rotated = DirectionUtility.Rotate(state.GetDirection(lamp.Channel), turn);
+                        var nextState = state.WithDirection(lamp.Channel, rotated, StagePhase.Playing);
+                        var key = MakeKey(stage, nextState);
+                        if (!visited.Add(key))
+                        {
+                            continue;
+                        }
+
+                        buckets[nextRotate].Enqueue(new Node
+                        {
+                            State = nextState,
+                            RotateCount = nextRotate,
+                            MoveCount = node.MoveCount,
+                            Parent = node,
+                            Command = $"R({lamp.Channel}:{turn})"
+                        });
                     }
                 }
             }
 
             return false;
+        }
+
+        private static FoundSolution BuildFound(Node parent, string lastCommand, int rotates, int moves, int explored)
+        {
+            var commands = new List<string>();
+            var cursor = parent;
+            var stack = new Stack<string>();
+            stack.Push(lastCommand);
+            while (cursor != null && cursor.Command != null)
+            {
+                stack.Push(cursor.Command);
+                cursor = cursor.Parent;
+            }
+
+            while (stack.Count > 0)
+            {
+                commands.Add(stack.Pop());
+            }
+
+            return new FoundSolution(rotates, moves, explored, commands);
         }
 
         private static Key MakeKey(StageDefinition stage, StageRuntimeState state)

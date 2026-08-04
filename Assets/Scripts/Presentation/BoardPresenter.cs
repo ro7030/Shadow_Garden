@@ -67,8 +67,8 @@ namespace ShadowGarden.Presentation
                     var label = CreateLabel(cell.transform, "Label", 0.16f, new Vector3(0f, -0.26f, -0.05f));
                     _labels[x, y] = label;
 
-                    var arrow = CreateLabel(cell.transform, "Arrow", 0.22f, new Vector3(0f, 0.20f, -0.05f));
-                    arrow.fontSize = 48;
+                    // Keep lamp direction arrows smaller than channel glyphs so they read as cues, not labels.
+                    var arrow = CreateLabel(cell.transform, "Arrow", 0.11f, new Vector3(0f, 0.20f, -0.05f));
                     _arrows[x, y] = arrow;
 
                     if (stage.IsPillar(pos))

@@ -14,3 +14,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: ShadowGarden.Infrastructure::ShadowGarden.Infrastructure.StageCatalogAsset
   stages:
   - {fileID: 11400000, guid: a0b12c36c8e9e4729ab2c4aac0072f69, type: 2}
+  - {fileID: 11400000, guid: 1ffa6684c67c741b8be9248a0a1b453b, type: 2}
+  - {fileID: 11400000, guid: 01de889b6d0ac4a75ab022fb8eee1517, type: 2}
+  - {fileID: 11400000, guid: 8001b2d7b64b5458bbb41f3c50622422, type: 2}
+  - {fileID: 11400000, guid: b5e743da677044173ba552174df85939, type: 2}
+  - {fileID: 11400000, guid: d7b44d969842944b3bf06e7e75bca6c2, type: 2}
+  - {fileID: 11400000, guid: f664a69d9d0ad4ccd89b9eaa2c6e0c15, type: 2}
+  - {fileID: 11400000, guid: a811425b2901944c69f9367ff3c08831, type: 2}
+  - {fileID: 11400000, guid: bb3859215927d469b87e2366c2964320, type: 2}
+  - {fileID: 11400000, guid: ea16620d9f9b849ec88d56fa6ba21777, type: 2}
+  - {fileID: 11400000, guid: ba9fa1ccd1d074f79a46727a4c056a4c, type: 2}
+  - {fileID: 11400000, guid: 69ee577f615264d9e8fe26ea5c3ee24e, type: 2}

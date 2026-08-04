@@ -46,9 +46,14 @@ namespace ShadowGarden.Tests.PlayMode
             session.Rotate(1);
             yield return null;
 
-            var path = MainStages.Stage1_1SolutionPathAfterEastRotate();
+            var path = MainStages.Solution_1_1().PathCells;
             for (var i = 2; i < path.Count; i++)
             {
+                if (path[i] == path[i - 1])
+                {
+                    continue;
+                }
+
                 StepToward(session, path[i]);
                 yield return null;
             }

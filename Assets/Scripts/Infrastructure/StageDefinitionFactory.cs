@@ -25,6 +25,19 @@ namespace ShadowGarden.Infrastructure
 
         public static void ApplyGraybox(StageDefinitionAsset asset, StageDefinition definition)
         {
+            ApplyDefinition(asset, definition, null);
+        }
+
+        public static void ApplyProduction(StageDefinitionAsset asset, StageBundle bundle)
+        {
+            ApplyDefinition(asset, bundle.Definition, bundle.Solution);
+        }
+
+        public static void ApplyDefinition(
+            StageDefinitionAsset asset,
+            StageDefinition definition,
+            RecordedSolution solution)
+        {
             asset.stageId = definition.StageId;
             asset.boardWidth = definition.BoardSize.Width;
             asset.boardHeight = definition.BoardSize.Height;
@@ -66,6 +79,29 @@ namespace ShadowGarden.Infrastructure
                     position = new GridPositionAuthoring { x = pillar.Position.X, y = pillar.Position.Y },
                     channel = pillar.Channel,
                     height = pillar.Height
+                });
+            }
+
+            asset.recordedSolutionPath = new List<GridPositionAuthoring>();
+            asset.recordedRotates = new List<RecordedRotateAuthoring>();
+            asset.documentedMinRotates = 0;
+            if (solution == null)
+            {
+                return;
+            }
+
+            asset.documentedMinRotates = solution.DocumentedMinRotates;
+            foreach (var cell in solution.PathCells)
+            {
+                asset.recordedSolutionPath.Add(new GridPositionAuthoring { x = cell.X, y = cell.Y });
+            }
+
+            foreach (var rotate in solution.Rotates)
+            {
+                asset.recordedRotates.Add(new RecordedRotateAuthoring
+                {
+                    channel = rotate.Channel,
+                    quarterTurnsClockwise = rotate.QuarterTurnsClockwise
                 });
             }
         }

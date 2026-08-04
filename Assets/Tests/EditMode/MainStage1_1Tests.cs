@@ -37,10 +37,15 @@ namespace ShadowGarden.Tests.EditMode
             var rotate = session.Rotate(1);
             Assert.IsTrue(System.Array.Exists(rotate.Events, e => e.Type == StageEventType.LampRotated));
 
-            var path = MainStages.Stage1_1SolutionPathAfterEastRotate();
-            // path[0]=start, path[1]=lamp already occupied after first move
-            for (var i = 2; i < path.Count; i++)
+            var path = MainStages.Solution_1_1().PathCells;
+            // path[0]=start; path[1..2] stay on lamp for rotate (already done); walk from index 3
+            for (var i = 3; i < path.Count; i++)
             {
+                if (path[i] == path[i - 1])
+                {
+                    continue;
+                }
+
                 var from = session.State.PlayerPosition;
                 var to = path[i];
                 var dx = to.X - from.X;
@@ -67,7 +72,6 @@ namespace ShadowGarden.Tests.EditMode
                     Assert.AreEqual(MoveOutcome.ExitReached, result.Move.Value.Outcome);
                     Assert.IsTrue(System.Array.Exists(result.Events, e => e.Type == StageEventType.ClearStarted));
                     Assert.AreEqual(StagePhase.ResolvingClear, session.State.Phase);
-                    // Timer locked on clear
                     var before = session.State.RemainingMilliseconds;
                     session.Tick(1000);
                     Assert.AreEqual(before, session.State.RemainingMilliseconds);
@@ -100,9 +104,14 @@ namespace ShadowGarden.Tests.EditMode
             Assert.AreEqual(1, session.State.RemainingMilliseconds);
             Assert.AreEqual(StagePhase.Playing, session.State.Phase);
 
-            var path = MainStages.Stage1_1SolutionPathAfterEastRotate();
-            for (var i = 2; i < path.Count; i++)
+            var path = MainStages.Solution_1_1().PathCells;
+            for (var i = 3; i < path.Count; i++)
             {
+                if (path[i] == path[i - 1])
+                {
+                    continue;
+                }
+
                 var from = session.State.PlayerPosition;
                 var to = path[i];
                 var dx = to.X - from.X;
