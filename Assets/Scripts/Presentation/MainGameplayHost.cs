@@ -36,13 +36,33 @@ namespace ShadowGarden.Presentation
         public bool IsSequencing => _sequencing;
         public int RestartCount => _restartCount;
         public OnboardingHintsPresenter Onboarding => onboarding;
+        public MainPlayHud PlayHud => playHud;
+
+        private bool _externalPause;
 
         public void Bind(MainCompositionRoot main)
         {
             UnsubscribeInput();
             _main = main;
             EnsureComponents();
+            playHud?.Bind(main);
             SubscribeInput();
+        }
+
+        public void SetExternalPause(bool paused)
+        {
+            _externalPause = paused;
+            if (_session == null || !_active)
+            {
+                return;
+            }
+
+            // Reuse focus pause contract so timer freezes without failing the stage.
+            _session.SetFocus(!paused);
+            if (paused)
+            {
+                _main?.Input?.EnableGameplay(false);
+            }
         }
 
         public void BeginStage(string stageId)
@@ -77,6 +97,7 @@ namespace ShadowGarden.Presentation
             playerPresenter.Snap(definition.PlayerStart);
             onboarding.ResetProgress();
             playHud.EnsureBuilt(hudParent != null ? hudParent : transform);
+            playHud.Bind(_main);
             playHud.SetVisible(true);
             playHud.Render(definition, _session.State);
             BoardCameraFitter.Apply(Camera.main, definition.BoardSize);
@@ -250,6 +271,7 @@ namespace ShadowGarden.Presentation
             // R always restarts during Playing (immediate reset).
             if (_main.CurrentState == AppState.Playing)
             {
+                onboarding?.NotifyResetUsed();
                 RestartActiveStage();
             }
         }
@@ -266,7 +288,20 @@ namespace ShadowGarden.Presentation
                 return;
             }
 
-            _session.SetFocus(hasFocus);
+            if (_externalPause)
+            {
+                return;
+            }
+
+            if (!hasFocus)
+            {
+                _session.SetFocus(false);
+                _main?.NotifyFocusLost();
+                return;
+            }
+
+            _main?.NotifyFocusGained();
+            // Timer resumes only after the focus-return overlay is dismissed.
         }
 
         private void OnCommandApplied(StageCommandResult result)
@@ -277,6 +312,12 @@ namespace ShadowGarden.Presentation
                 {
                     case StageEventType.GameOverStarted:
                         StartCoroutine(GameOverSequence(stageEvent.GameOverCause ?? GameOverCause.CliffFall));
+                        break;
+                    case StageEventType.TimerWarning30:
+                        playHud?.ShowTransientWarning("남은 시간 30초", UiTheme.Brass);
+                        break;
+                    case StageEventType.TimerWarning10:
+                        playHud?.ShowTransientWarning("남은 시간 10초!", UiTheme.Coral);
                         break;
                     case StageEventType.ClearStarted:
                         _clearElapsedMs = _definition.TimeLimitSeconds * 1000L -
@@ -351,7 +392,7 @@ namespace ShadowGarden.Presentation
                 yield return new WaitForSecondsRealtime(0.35f);
             }
 
-            _main?.NotifyGameOver();
+            _main?.NotifyGameOver(cause);
             _sequencing = false;
         }
 

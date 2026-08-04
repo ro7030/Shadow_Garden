@@ -26,8 +26,8 @@ namespace ShadowGarden.Presentation
         public static readonly Color PlayerCloak = new Color(0.10f, 0.16f, 0.40f, 1f);
         public static readonly Color PlayerHood = new Color(0.08f, 0.12f, 0.32f, 1f);
         public static readonly Color HudNavy = new Color(0.14f, 0.20f, 0.38f, 0.92f);
-        public static readonly Color WarningAmber = new Color(0.85f, 0.62f, 0.22f, 1f);
-        public static readonly Color WarningCoral = new Color(0.95f, 0.55f, 0.50f, 1f);
+        public static readonly Color WarningAmber = UiTheme.Brass;
+        public static readonly Color WarningCoral = UiTheme.Coral;
 
         public static Color ChannelColor(ChannelId channel) => channel switch
         {

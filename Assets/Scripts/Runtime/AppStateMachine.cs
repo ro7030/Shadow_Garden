@@ -13,7 +13,7 @@ namespace ShadowGarden.Runtime
             {
                 [AppState.Title] = new HashSet<AppState> { AppState.Opening, AppState.WorldMap },
                 [AppState.Opening] = new HashSet<AppState> { AppState.WorldMap },
-                [AppState.WorldMap] = new HashSet<AppState> { AppState.Playing, AppState.Title },
+                [AppState.WorldMap] = new HashSet<AppState> { AppState.Playing, AppState.Title, AppState.Opening },
                 [AppState.Playing] = new HashSet<AppState> { AppState.GameOver, AppState.Cleared, AppState.WorldMap },
                 [AppState.GameOver] = new HashSet<AppState> { AppState.Playing, AppState.WorldMap },
                 [AppState.Cleared] = new HashSet<AppState> { AppState.WorldMap, AppState.Playing, AppState.Ending },

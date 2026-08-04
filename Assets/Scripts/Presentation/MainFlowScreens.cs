@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using ShadowGarden.Core;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -19,10 +20,20 @@ namespace ShadowGarden.Presentation
 
         private Button _titleContinue;
         private Button _titleNewGame;
+        private Button _titleReplayOpening;
+        private Button _titleSettings;
         private TextMeshProUGUI _titleProgressLabel;
+        private TextMeshProUGUI _titleConceptLabel;
         private Button _openingContinue;
+        private Button _openingSkip;
+        private TextMeshProUGUI _openingBody;
+        private TextMeshProUGUI _openingPageLabel;
+        private int _openingPage;
         private Button _endingWorldMap;
         private Button _endingTitle;
+        private TextMeshProUGUI _gameOverReason;
+        private TextMeshProUGUI _clearedDetail;
+        private TextMeshProUGUI _endingCredits;
 
         private readonly Dictionary<string, Button> _stageButtons = new Dictionary<string, Button>();
         private readonly List<Button> _modalButtons = new List<Button>();
@@ -136,6 +147,20 @@ namespace ShadowGarden.Presentation
             if (state == AppState.GameOver)
             {
                 EnsureGameOver(router?.GameOverRoot);
+                if (_gameOverReason != null && main != null)
+                {
+                    var goal = ClearGoalType.ExitDoor;
+                    if (main.Catalog != null &&
+                        main.Catalog.TryGetById(main.PendingStageId, out var asset) &&
+                        asset != null)
+                    {
+                        goal = asset.clearGoalType;
+                    }
+
+                    _gameOverReason.text = MockupPalette.GameOverReason(main.LastGameOverCause, goal);
+                    UiTypography.Apply(_gameOverReason, bold: false);
+                }
+
                 _modalVm = ModalViewModel.CreateGameOver();
                 RebuildModalButtons(router.GameOverRoot, _modalVm);
                 SelectModalIndex(0);
@@ -146,6 +171,38 @@ namespace ShadowGarden.Presentation
                 var next = main?.ResolveNextStageAfterClear();
                 var isFinal = main != null && main.IsFinalStageClear();
                 var nextWorld = main != null && main.IsWorldFinaleClear();
+                if (_clearedDetail != null && main != null)
+                {
+                    var id = main.LastClearedStageId ?? main.PendingStageId;
+                    var time = ProgressTimeFormat.FormatBestClear((long?)main.LastClearElapsedMilliseconds);
+                    var nightFlower = false;
+                    if (main.Catalog != null &&
+                        main.Catalog.TryGetById(id, out var clearedAsset) &&
+                        clearedAsset != null)
+                    {
+                        nightFlower = clearedAsset.clearGoalType == ClearGoalType.NightFlower;
+                    }
+
+                    if (isFinal)
+                    {
+                        _clearedDetail.text = $"3-4 밤꽃 완료  ·  {time}\n세 정원이 모두 되살아났습니다.";
+                    }
+                    else if (nextWorld)
+                    {
+                        _clearedDetail.text = $"{id} 밤꽃 완료  ·  {time}\n다음 월드가 해금되었습니다.";
+                    }
+                    else if (nightFlower)
+                    {
+                        _clearedDetail.text = $"{id} 밤꽃 완료  ·  {time}";
+                    }
+                    else
+                    {
+                        _clearedDetail.text = $"{id} 출구 완료  ·  {time}";
+                    }
+
+                    UiTypography.Apply(_clearedDetail, bold: false);
+                }
+
                 _modalVm = ModalViewModel.CreateCleared(
                     hasNextStage: !string.IsNullOrWhiteSpace(next) || isFinal,
                     isFinalStage: isFinal,
@@ -214,6 +271,13 @@ namespace ShadowGarden.Presentation
             {
                 CycleTitleFocus(dy != 0 ? -dy : dx);
             }
+            else if (state == AppState.Opening)
+            {
+                if (dy != 0 || dx != 0)
+                {
+                    ToggleOpeningFocus();
+                }
+            }
             else if (state == AppState.Ending)
             {
                 if (dy != 0 || dx != 0)
@@ -236,7 +300,7 @@ namespace ShadowGarden.Presentation
                     ActivateSelectedOrDefault(_titleContinue);
                     break;
                 case AppState.Opening:
-                    main.CompleteOpening();
+                    AdvanceOpeningOrComplete();
                     break;
                 case AppState.WorldMap:
                     if (_worldMapVm != null &&
@@ -277,16 +341,106 @@ namespace ShadowGarden.Presentation
             EnsureGameOver(router.GameOverRoot);
             EnsureCleared(router.ClearedRoot);
             EnsureEnding(router.EndingRoot);
+            HideGameplayPlaceholderLabel(router.GameplayRoot);
+        }
+
+        private static void HideGameplayPlaceholderLabel(GameObject root)
+        {
+            if (root == null)
+            {
+                return;
+            }
+
+            foreach (var tmp in root.GetComponentsInChildren<TextMeshProUGUI>(true))
+            {
+                if (tmp == null)
+                {
+                    continue;
+                }
+
+                // Scene placeholder "Gameplay" must not cover the board.
+                if (tmp.transform.parent == root.transform &&
+                    (tmp.name.Contains("Label") || tmp.text == "Gameplay" || tmp.fontSize >= 32f))
+                {
+                    tmp.gameObject.SetActive(false);
+                }
+            }
         }
 
         private void WireCallbacks()
         {
             SetClick(_titleContinue, () => main?.ContinueFromTitle());
             SetClick(_titleNewGame, () => main?.StartNewGameFromTitle());
-            SetClick(_openingContinue, () => main?.CompleteOpening());
+            SetClick(_titleReplayOpening, () => main?.ReplayOpening());
+            SetClick(_titleSettings, () => main?.OpenSettingsFromTitle());
+            SetClick(_openingContinue, AdvanceOpeningOrComplete);
+            SetClick(_openingSkip, () => main?.CompleteOpening());
             SetClick(_endingWorldMap, () => main?.FinishEndingToWorldMap());
             SetClick(_endingTitle, () => main?.FinishEnding());
         }
+
+        public void RefreshOpening()
+        {
+            if (router?.OpeningRoot == null)
+            {
+                return;
+            }
+
+            EnsureOpening(router.OpeningRoot);
+            _openingPage = 0;
+            ApplyOpeningPage();
+            SelectButton(_openingContinue);
+        }
+
+        private void AdvanceOpeningOrComplete()
+        {
+            if (_openingPage < OpeningPages.Length - 1)
+            {
+                _openingPage++;
+                ApplyOpeningPage();
+                SelectButton(_openingContinue);
+                return;
+            }
+
+            main?.CompleteOpening();
+        }
+
+        private void ApplyOpeningPage()
+        {
+            if (_openingBody == null)
+            {
+                return;
+            }
+
+            var index = Mathf.Clamp(_openingPage, 0, OpeningPages.Length - 1);
+            _openingBody.text = OpeningPages[index];
+            UiTypography.Apply(_openingBody, bold: false);
+            if (_openingPageLabel != null)
+            {
+                _openingPageLabel.text = $"{index + 1} / {OpeningPages.Length}";
+                UiTypography.Apply(_openingPageLabel, bold: false);
+            }
+
+            if (_openingContinue != null)
+            {
+                var label = _openingContinue.GetComponentInChildren<TextMeshProUGUI>(true);
+                if (label != null)
+                {
+                    label.text = index >= OpeningPages.Length - 1 ? "정원으로" : "다음";
+                    UiTypography.Apply(label, bold: true);
+                }
+            }
+        }
+
+        private static readonly string[] OpeningPages =
+        {
+            "정오의 정원이 멈췄다.\n해가 제자리에 굳어 그림자도 숨이 멎었다.",
+            "모아가 밤씨앗을 품고 도착한다.\n잠든 길을 다시 열어야 한다.",
+            "태양등을 돌리면 그림자가 길을 연다.\n남색 길만이 발이 닿는 땅이다.",
+            "겹친 그림자와 빈 절벽은 위험하다.\n한 칸씩, 천천히 읽으며 걷자.",
+            "출구 문으로 방을 지나고,\n밤꽃을 피워 월드를 깨운다.",
+            "첫 그림자를 따라 걸어 보자.\n정원이 다시 숨을 쉴 때까지."
+        };
 
         private void EnsureTitle(GameObject root)
         {
@@ -296,9 +450,14 @@ namespace ShadowGarden.Presentation
             }
 
             SetRootLabel(root, "그림자 정원");
-            _titleContinue = EnsureButton(root.transform, "ContinueButton", "시작", new Vector2(0f, -40f));
-            _titleNewGame = EnsureButton(root.transform, "NewGameButton", "새로 시작", new Vector2(0f, -120f));
-            _titleProgressLabel = EnsureLabel(root.transform, "ProgressLabel", string.Empty, new Vector2(0f, -190f), 22f);
+            _titleConceptLabel = EnsureLabel(root.transform, "ConceptLabel",
+                "빛과 그림자로 잠든 정원을 되살린다", new Vector2(0f, 100f), 22f);
+            _titleContinue = EnsureButton(root.transform, "ContinueButton", "시작", new Vector2(0f, 20f));
+            _titleNewGame = EnsureButton(root.transform, "NewGameButton", "새로 시작", new Vector2(0f, -50f));
+            _titleReplayOpening = EnsureButton(root.transform, "ReplayOpeningButton", "오프닝 다시 보기",
+                new Vector2(0f, -120f));
+            _titleSettings = EnsureButton(root.transform, "SettingsButton", "설정", new Vector2(0f, -190f));
+            _titleProgressLabel = EnsureLabel(root.transform, "ProgressLabel", string.Empty, new Vector2(0f, -260f), 20f);
             // Remove legacy StartButton if present.
             var legacy = root.transform.Find("StartButton");
             if (legacy != null)
@@ -314,8 +473,14 @@ namespace ShadowGarden.Presentation
                 return;
             }
 
-            SetRootLabel(root, "Opening");
-            _openingContinue = EnsureButton(root.transform, "ContinueButton", "계속", new Vector2(0f, -80f));
+            SetRootLabel(root, "오프닝");
+            _openingPageLabel = EnsureLabel(root.transform, "OpeningPageLabel", "1 / 6",
+                new Vector2(0f, 160f), 18f);
+            _openingBody = EnsureLabel(root.transform, "OpeningBody",
+                "정원이 숨을 고른다.", new Vector2(0f, 20f), 24f);
+            _openingBody.rectTransform.sizeDelta = new Vector2(720f, 220f);
+            _openingContinue = EnsureButton(root.transform, "ContinueButton", "다음", new Vector2(0f, -160f));
+            _openingSkip = EnsureButton(root.transform, "SkipButton", "건너뛰기", new Vector2(0f, -230f));
         }
 
         private void EnsureWorldMap(GameObject root)
@@ -368,7 +533,9 @@ namespace ShadowGarden.Presentation
             }
 
             SetRootLabel(root, "게임 오버");
-            // Buttons rebuilt from ModalViewModel on show.
+            _gameOverReason = EnsureLabel(root.transform, "ReasonLabel", string.Empty,
+                new Vector2(0f, 40f), 22f);
+            _gameOverReason.rectTransform.sizeDelta = new Vector2(720f, 100f);
             EnsureButton(root.transform, "RetryButton", "다시 도전", new Vector2(0f, -40f));
             EnsureButton(root.transform, "WorldMapButton", "레벨 선택", new Vector2(0f, -120f));
         }
@@ -381,6 +548,9 @@ namespace ShadowGarden.Presentation
             }
 
             SetRootLabel(root, "완료");
+            _clearedDetail = EnsureLabel(root.transform, "DetailLabel", string.Empty,
+                new Vector2(0f, 50f), 22f);
+            _clearedDetail.rectTransform.sizeDelta = new Vector2(720f, 80f);
             EnsureButton(root.transform, "RetryButton", "다시 도전", new Vector2(0f, -40f));
             EnsureButton(root.transform, "WorldMapButton", "레벨 선택", new Vector2(0f, -120f));
             EnsureButton(root.transform, "NextButton", "다음 스테이지", new Vector2(0f, -40f));
@@ -399,11 +569,19 @@ namespace ShadowGarden.Presentation
                 root.transform,
                 "EndingBody",
                 "세 정원이 다시 숨을 쉬기 시작했습니다.",
-                new Vector2(0f, -20f),
+                new Vector2(0f, 40f),
                 24f);
             body.gameObject.SetActive(true);
-            _endingWorldMap = EnsureButton(root.transform, "WorldMapButton", "레벨 선택", new Vector2(0f, -100f));
-            _endingTitle = EnsureButton(root.transform, "TitleButton", "타이틀", new Vector2(0f, -180f));
+            body.rectTransform.sizeDelta = new Vector2(720f, 80f);
+            _endingCredits = EnsureLabel(
+                root.transform,
+                "CreditsLabel",
+                "제작 · Shadow Garden\nCore · Runtime · Presentation\nFont · Noto Sans KR (SIL OFL 1.1)",
+                new Vector2(0f, -40f),
+                18f);
+            _endingCredits.rectTransform.sizeDelta = new Vector2(720f, 100f);
+            _endingWorldMap = EnsureButton(root.transform, "WorldMapButton", "레벨 선택", new Vector2(0f, -140f));
+            _endingTitle = EnsureButton(root.transform, "TitleButton", "타이틀", new Vector2(0f, -210f));
         }
 
         private void RebuildWorldCards()
@@ -622,20 +800,59 @@ namespace ShadowGarden.Presentation
 
         private void CycleTitleFocus(int delta)
         {
+            var buttons = new List<Button>();
+            if (_titleContinue != null && _titleContinue.gameObject.activeInHierarchy)
+            {
+                buttons.Add(_titleContinue);
+            }
+
             if (_titleNewGame != null && _titleNewGame.gameObject.activeInHierarchy)
             {
-                var currentIsNew = EventSystem.current != null &&
-                                   EventSystem.current.currentSelectedGameObject == _titleNewGame.gameObject;
-                if (delta == 0)
-                {
-                    return;
-                }
+                buttons.Add(_titleNewGame);
+            }
 
-                SelectButton(currentIsNew ? _titleContinue : _titleNewGame);
+            if (_titleReplayOpening != null && _titleReplayOpening.gameObject.activeInHierarchy)
+            {
+                buttons.Add(_titleReplayOpening);
+            }
+
+            if (_titleSettings != null && _titleSettings.gameObject.activeInHierarchy)
+            {
+                buttons.Add(_titleSettings);
+            }
+
+            if (buttons.Count == 0 || delta == 0)
+            {
+                return;
+            }
+
+            var current = EventSystem.current != null
+                ? EventSystem.current.currentSelectedGameObject
+                : null;
+            var index = 0;
+            for (var i = 0; i < buttons.Count; i++)
+            {
+                if (buttons[i].gameObject == current)
+                {
+                    index = i;
+                    break;
+                }
+            }
+
+            index = (index + delta + buttons.Count * 8) % buttons.Count;
+            SelectButton(buttons[index]);
+        }
+
+        private void ToggleOpeningFocus()
+        {
+            if (EventSystem.current != null &&
+                EventSystem.current.currentSelectedGameObject == _openingSkip?.gameObject)
+            {
+                SelectButton(_openingContinue);
             }
             else
             {
-                SelectButton(_titleContinue);
+                SelectButton(_openingSkip);
             }
         }
 
@@ -707,6 +924,11 @@ namespace ShadowGarden.Presentation
             tmp.text = text;
             tmp.fontSize = Mathf.Max(tmp.fontSize, 40);
             tmp.alignment = TextAlignmentOptions.Center;
+            var rt = tmp.rectTransform;
+            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 1f);
+            rt.pivot = new Vector2(0.5f, 1f);
+            rt.anchoredPosition = new Vector2(0f, -UiTheme.SafeMargin);
+            rt.sizeDelta = new Vector2(720f, 64f);
             UiTypography.Apply(tmp, bold: true);
         }
 
@@ -715,10 +937,10 @@ namespace ShadowGarden.Presentation
             var go = new GameObject("TitleLabel", typeof(RectTransform));
             go.transform.SetParent(parent, false);
             var rt = go.GetComponent<RectTransform>();
-            rt.anchorMin = new Vector2(0.5f, 0.5f);
-            rt.anchorMax = new Vector2(0.5f, 0.5f);
-            rt.sizeDelta = new Vector2(640f, 80f);
-            rt.anchoredPosition = new Vector2(0f, 180f);
+            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 1f);
+            rt.pivot = new Vector2(0.5f, 1f);
+            rt.sizeDelta = new Vector2(720f, 64f);
+            rt.anchoredPosition = new Vector2(0f, -UiTheme.SafeMargin);
             var tmp = go.AddComponent<TextMeshProUGUI>();
             tmp.text = text;
             tmp.alignment = TextAlignmentOptions.Center;
@@ -795,10 +1017,10 @@ namespace ShadowGarden.Presentation
             var rt = go.GetComponent<RectTransform>();
             rt.anchorMin = new Vector2(0.5f, 0.5f);
             rt.anchorMax = new Vector2(0.5f, 0.5f);
-            rt.sizeDelta = new Vector2(280f, 56f);
+            rt.sizeDelta = new Vector2(Mathf.Max(280f, UiTheme.ButtonWidth * 0.9f), Mathf.Max(56f, UiTheme.ButtonMinHeight));
             rt.anchoredPosition = anchoredPos;
             var image = go.GetComponent<Image>();
-            image.color = new Color(0.16f, 0.22f, 0.34f, 0.92f);
+            image.color = UiTheme.Navy;
 
             var textGo = new GameObject("Label", typeof(RectTransform));
             textGo.transform.SetParent(go.transform, false);
@@ -810,9 +1032,15 @@ namespace ShadowGarden.Presentation
             var tmp = textGo.AddComponent<TextMeshProUGUI>();
             tmp.text = label;
             tmp.alignment = TextAlignmentOptions.Center;
-            tmp.fontSize = 26;
-            tmp.color = Color.white;
+            tmp.fontSize = UiTheme.ButtonFont;
+            tmp.color = UiTheme.Ivory;
             UiTypography.Apply(tmp, bold: true);
+
+            var outline = go.AddComponent<Outline>();
+            outline.effectColor = UiTheme.Mint;
+            outline.effectDistance = new Vector2(UiTheme.FocusOutline, UiTheme.FocusOutline);
+            outline.enabled = false;
+            go.AddComponent<UiFocusOutline>();
 
             return go.GetComponent<Button>();
         }

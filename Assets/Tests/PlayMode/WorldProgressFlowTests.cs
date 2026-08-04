@@ -75,6 +75,9 @@ namespace ShadowGarden.Tests.PlayMode
             yield return null;
             Assert.AreEqual(AppState.Playing, root.CurrentState);
             Assert.AreEqual("1-2", root.PendingStageId);
+            Assert.IsNotNull(root.Gameplay);
+            Assert.IsNotNull(root.Gameplay.Definition);
+            Assert.AreEqual("1-2", root.Gameplay.Definition.StageId);
         }
 
         [UnityTest]
