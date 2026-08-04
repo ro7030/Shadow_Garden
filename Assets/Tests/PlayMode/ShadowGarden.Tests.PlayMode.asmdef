@@ -4,9 +4,11 @@
     "references": [
         "ShadowGarden.Core",
         "ShadowGarden.Runtime",
+        "ShadowGarden.Infrastructure",
         "ShadowGarden.Presentation",
         "UnityEngine.TestRunner",
-        "UnityEditor.TestRunner"
+        "UnityEditor.TestRunner",
+        "Unity.InputSystem"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

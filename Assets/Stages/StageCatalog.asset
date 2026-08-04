@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ddb1f2b6fc40a486490294fe2e4a3ce1, type: 3}
+  m_Name: StageCatalog
+  m_EditorClassIdentifier: ShadowGarden.Infrastructure::ShadowGarden.Infrastructure.StageCatalogAsset
+  stages:
+  - {fileID: 11400000, guid: 12565bf25d1a44f92a57607e6ed755c7, type: 2}
+  - {fileID: 11400000, guid: 1c16cc561df64479c960bb63b50e1982, type: 2}
+  - {fileID: 11400000, guid: 817d7ba3649704c798d96bbe3f0b67d0, type: 2}
+  - {fileID: 11400000, guid: 8824a17fdcb0b4b9790e2e15b34a0037, type: 2}
