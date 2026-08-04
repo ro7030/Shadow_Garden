@@ -1,0 +1,19 @@
+{
+    "name": "ShadowGarden.Presentation.Editor",
+    "rootNamespace": "ShadowGarden.Presentation.EditorTools",
+    "references": [
+        "ShadowGarden.Presentation",
+        "Unity.TextMeshPro"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

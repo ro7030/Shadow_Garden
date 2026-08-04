@@ -1,17 +1,17 @@
 using ShadowGarden.Core;
+using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
 
 namespace ShadowGarden.Presentation
 {
     /// <summary>
-    /// Main-scene play HUD built with uGUI. Never uses OnGUI.
+    /// Main-scene play HUD built with uGUI + TextMeshPro. Never uses OnGUI.
     /// </summary>
     public sealed class MainPlayHud : MonoBehaviour
     {
-        [SerializeField] private Text stageLabel;
-        [SerializeField] private Text timerLabel;
-        [SerializeField] private Text goalLabel;
+        [SerializeField] private TextMeshProUGUI stageLabel;
+        [SerializeField] private TextMeshProUGUI timerLabel;
+        [SerializeField] private TextMeshProUGUI goalLabel;
         [SerializeField] private GameObject root;
 
         public void EnsureBuilt(Transform parent)
@@ -26,11 +26,11 @@ namespace ShadowGarden.Presentation
             StretchFull(root.GetComponent<RectTransform>());
 
             stageLabel = CreateLabel(root.transform, "StageLabel", new Vector2(0f, 1f), new Vector2(0f, 1f),
-                new Vector2(24f, -24f), new Vector2(420f, 48f), TextAnchor.UpperLeft, 28);
+                new Vector2(24f, -24f), new Vector2(420f, 48f), TextAlignmentOptions.TopLeft, 28, bold: true);
             timerLabel = CreateLabel(root.transform, "TimerLabel", new Vector2(1f, 1f), new Vector2(1f, 1f),
-                new Vector2(-24f, -24f), new Vector2(220f, 48f), TextAnchor.UpperRight, 32);
+                new Vector2(-24f, -24f), new Vector2(220f, 48f), TextAlignmentOptions.TopRight, 32, bold: true);
             goalLabel = CreateLabel(root.transform, "GoalLabel", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-                new Vector2(0f, -24f), new Vector2(360f, 40f), TextAnchor.UpperCenter, 22);
+                new Vector2(0f, -24f), new Vector2(360f, 40f), TextAlignmentOptions.Top, 22, bold: false);
         }
 
         public void SetVisible(bool visible)
@@ -73,15 +73,16 @@ namespace ShadowGarden.Presentation
             return $"{m:0}:{s:00}";
         }
 
-        private static Text CreateLabel(
+        private static TextMeshProUGUI CreateLabel(
             Transform parent,
             string name,
             Vector2 anchorMin,
             Vector2 anchorMax,
             Vector2 anchoredPos,
             Vector2 size,
-            TextAnchor align,
-            int fontSize)
+            TextAlignmentOptions align,
+            int fontSize,
+            bool bold)
         {
             var go = new GameObject(name, typeof(RectTransform));
             go.transform.SetParent(parent, false);
@@ -91,14 +92,13 @@ namespace ShadowGarden.Presentation
             rt.pivot = anchorMin;
             rt.anchoredPosition = anchoredPos;
             rt.sizeDelta = size;
-            var text = go.AddComponent<Text>();
+            var text = go.AddComponent<TextMeshProUGUI>();
             text.alignment = align;
             text.fontSize = fontSize;
             text.color = Color.white;
             text.text = name;
             text.raycastTarget = false;
-            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf")
-                        ?? Resources.GetBuiltinResource<Font>("Arial.ttf");
+            UiTypography.Apply(text, bold);
             return text;
         }
 

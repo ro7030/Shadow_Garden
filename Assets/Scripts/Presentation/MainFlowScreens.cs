@@ -42,6 +42,7 @@ namespace ShadowGarden.Presentation
             if (label != null)
             {
                 label.text = "1-1  첫 그림자";
+                UiTypography.Apply(label, bold: true);
             }
         }
 
@@ -129,18 +130,41 @@ namespace ShadowGarden.Presentation
 
         private static void SetRootLabel(GameObject root, string text)
         {
-            var existing = root.GetComponentInChildren<Text>();
-            if (existing != null)
+            foreach (var legacy in root.GetComponentsInChildren<Text>(true))
             {
-                existing.text = text;
-                return;
+                Object.Destroy(legacy);
             }
 
-            var tmp = root.GetComponentInChildren<TextMeshProUGUI>();
-            if (tmp != null)
+            var tmp = root.GetComponentInChildren<TextMeshProUGUI>(true);
+            if (tmp == null)
             {
-                tmp.text = text;
+                tmp = CreateTitleLabel(root.transform, text);
             }
+
+            tmp.gameObject.SetActive(true);
+            tmp.text = text;
+            tmp.fontSize = Mathf.Max(tmp.fontSize, 40);
+            tmp.alignment = TextAlignmentOptions.Center;
+            UiTypography.Apply(tmp, bold: true);
+        }
+
+        private static TextMeshProUGUI CreateTitleLabel(Transform parent, string text)
+        {
+            var go = new GameObject("TitleLabel", typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            var rt = go.GetComponent<RectTransform>();
+            rt.anchorMin = new Vector2(0.5f, 0.5f);
+            rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.sizeDelta = new Vector2(640f, 80f);
+            rt.anchoredPosition = new Vector2(0f, 40f);
+            var tmp = go.AddComponent<TextMeshProUGUI>();
+            tmp.text = text;
+            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.fontSize = 48;
+            tmp.color = Color.white;
+            tmp.raycastTarget = false;
+            UiTypography.Apply(tmp, bold: true);
+            return tmp;
         }
 
         private static Button EnsureButton(Transform parent, string name, string label, Vector2 anchoredPos)
@@ -148,7 +172,15 @@ namespace ShadowGarden.Presentation
             var existing = parent.Find(name);
             if (existing != null)
             {
-                return existing.GetComponent<Button>();
+                var existingButton = existing.GetComponent<Button>();
+                var existingTmp = existing.GetComponentInChildren<TextMeshProUGUI>(true);
+                if (existingTmp != null)
+                {
+                    existingTmp.text = label;
+                    UiTypography.Apply(existingTmp, bold: true);
+                }
+
+                return existingButton;
             }
 
             var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
@@ -173,6 +205,7 @@ namespace ShadowGarden.Presentation
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.fontSize = 26;
             tmp.color = Color.white;
+            UiTypography.Apply(tmp, bold: true);
 
             return go.GetComponent<Button>();
         }

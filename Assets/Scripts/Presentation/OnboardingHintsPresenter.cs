@@ -1,4 +1,5 @@
 using ShadowGarden.Core;
+using TMPro;
 using UnityEngine;
 
 namespace ShadowGarden.Presentation
@@ -86,13 +87,13 @@ namespace ShadowGarden.Presentation
         {
             var go = new GameObject(name);
             go.transform.SetParent(transform, false);
-            var label = go.AddComponent<TextMesh>();
+            var label = go.AddComponent<TextMeshPro>();
             label.text = text;
-            label.characterSize = 0.12f;
-            label.fontSize = 48;
-            label.anchor = TextAnchor.MiddleCenter;
-            label.alignment = TextAlignment.Center;
+            label.fontSize = 5.5f;
+            label.alignment = TextAlignmentOptions.Center;
             label.color = new Color(1f, 1f, 1f, 0.92f);
+            label.rectTransform.sizeDelta = new Vector2(3f, 1f);
+            UiTypography.Apply(label, bold: true);
             go.SetActive(false);
             return go.transform;
         }

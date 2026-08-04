@@ -1,4 +1,5 @@
 using ShadowGarden.Core;
+using TMPro;
 using UnityEngine;
 
 namespace ShadowGarden.Presentation
@@ -13,8 +14,8 @@ namespace ShadowGarden.Presentation
 
         private SpriteRenderer[,] _cells;
         private SpriteRenderer[,] _overlays;
-        private TextMesh[,] _labels;
-        private TextMesh[,] _arrows;
+        private TextMeshPro[,] _labels;
+        private TextMeshPro[,] _arrows;
         private Transform[,] _pillars;
         private GridSize _size;
         private Sprite _quad;
@@ -31,8 +32,8 @@ namespace ShadowGarden.Presentation
             _softQuad = CreateRoundedSprite(0.28f);
             _cells = new SpriteRenderer[_size.Width, _size.Height];
             _overlays = new SpriteRenderer[_size.Width, _size.Height];
-            _labels = new TextMesh[_size.Width, _size.Height];
-            _arrows = new TextMesh[_size.Width, _size.Height];
+            _labels = new TextMeshPro[_size.Width, _size.Height];
+            _arrows = new TextMeshPro[_size.Width, _size.Height];
             _pillars = new Transform[_size.Width, _size.Height];
             _pulseTargets.Clear();
 
@@ -140,7 +141,7 @@ namespace ShadowGarden.Presentation
                             : MockupPalette.NightFlower;
                         label.text = stage.ClearGoalType == ClearGoalType.ExitDoor ? "⌂" : "❀";
                         label.color = Color.white;
-                        label.characterSize = 0.22f;
+                        label.fontSize = 0.22f * 36f;
                         label.transform.localPosition = new Vector3(0f, 0.02f, -0.05f);
                         continue;
                     }
@@ -165,7 +166,7 @@ namespace ShadowGarden.Presentation
                             0.42f);
                         label.text = "×2";
                         label.color = new Color(1f, 0.78f, 0.72f, 1f);
-                        label.characterSize = 0.18f;
+                        label.fontSize = 0.18f * 36f;
                         _pulseTargets.Add((cell.transform, Vector3.one * 0.90f));
                     }
                     else if (kind == CellKind.Cliff)
@@ -400,17 +401,17 @@ namespace ShadowGarden.Presentation
             renderer.sharedMaterial = mat;
         }
 
-        private static TextMesh CreateLabel(Transform parent, string name, float characterSize, Vector3 localPos)
+        private static TextMeshPro CreateLabel(Transform parent, string name, float characterSize, Vector3 localPos)
         {
             var go = new GameObject(name);
             go.transform.SetParent(parent, false);
             go.transform.localPosition = localPos;
-            var text = go.AddComponent<TextMesh>();
-            text.anchor = TextAnchor.MiddleCenter;
-            text.alignment = TextAlignment.Center;
-            text.characterSize = characterSize;
-            text.fontSize = 36;
+            var text = go.AddComponent<TextMeshPro>();
+            text.alignment = TextAlignmentOptions.Center;
+            text.fontSize = characterSize * 36f;
             text.color = Color.white;
+            text.rectTransform.sizeDelta = new Vector2(2f, 1f);
+            UiTypography.Apply(text, bold: true);
             return text;
         }
 

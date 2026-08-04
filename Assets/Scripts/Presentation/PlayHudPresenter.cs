@@ -134,6 +134,7 @@ namespace ShadowGarden.Presentation
                 fontSize = 16,
                 normal = { textColor = new Color(1f, 1f, 1f, 0.9f) }
             };
+            UiTypography.ApplyToGuiStyle(style, bold: false);
             GUI.Label(new Rect(0, Screen.height - 48, Screen.width, 36), text, style);
         }
 
@@ -202,6 +203,7 @@ namespace ShadowGarden.Presentation
                 fontStyle = FontStyle.Bold,
                 normal = { textColor = selected ? Color.white : new Color(0.2f, 0.22f, 0.28f) }
             };
+            UiTypography.ApplyToGuiStyle(style, bold: true);
             GUI.Button(rect, label, style);
             GUI.backgroundColor = prev;
         }
@@ -242,27 +244,38 @@ namespace ShadowGarden.Presentation
                 fontStyle = FontStyle.Bold,
                 normal = { textColor = textColor ?? Color.white }
             };
+            UiTypography.ApplyToGuiStyle(style, bold: true);
             GUI.Label(rect, text, style);
         }
 
         private static Rect CenterBox(float width, float height) =>
             new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
 
-        private static GUIStyle TitleStyle(int size) => new GUIStyle(GUI.skin.label)
+        private static GUIStyle TitleStyle(int size)
         {
-            alignment = TextAnchor.MiddleCenter,
-            fontSize = size,
-            fontStyle = FontStyle.Bold,
-            normal = { textColor = MockupPalette.HudNavy }
-        };
+            var style = new GUIStyle(GUI.skin.label)
+            {
+                alignment = TextAnchor.MiddleCenter,
+                fontSize = size,
+                fontStyle = FontStyle.Bold,
+                normal = { textColor = MockupPalette.HudNavy }
+            };
+            UiTypography.ApplyToGuiStyle(style, bold: true);
+            return style;
+        }
 
-        private static GUIStyle BodyStyle(int size) => new GUIStyle(GUI.skin.label)
+        private static GUIStyle BodyStyle(int size)
         {
-            alignment = TextAnchor.UpperLeft,
-            fontSize = size,
-            wordWrap = true,
-            normal = { textColor = new Color(0.18f, 0.20f, 0.28f, 1f) }
-        };
+            var style = new GUIStyle(GUI.skin.label)
+            {
+                alignment = TextAnchor.UpperLeft,
+                fontSize = size,
+                wordWrap = true,
+                normal = { textColor = new Color(0.18f, 0.20f, 0.28f, 1f) }
+            };
+            UiTypography.ApplyToGuiStyle(style, bold: false);
+            return style;
+        }
 
         private static string FormatTimer(long ms)
         {

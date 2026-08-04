@@ -33,6 +33,7 @@ namespace ShadowGarden.Presentation
 
         private void Awake()
         {
+            UiTypography.ApplyDefaultSettings();
             EnsureScreenRouter();
             EnsureGameplayHost();
             EnsureFlowScreens();
