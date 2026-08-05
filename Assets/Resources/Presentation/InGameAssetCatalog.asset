@@ -1,0 +1,41 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ccd748edfa14b43babe3794e4abafb90, type: 3}
+  m_Name: InGameAssetCatalog
+  m_EditorClassIdentifier: ShadowGarden.Presentation::ShadowGarden.Presentation.InGameAssetCatalogAsset
+  moa: {fileID: 11400000, guid: f2db87061b0a4427582dad349ef10e23, type: 2}
+  gameplayFx: {fileID: 11400000, guid: 21d897ad9c3834aa7ba641e90bdc8e56, type: 2}
+  audio: {fileID: 11400000, guid: 2e6b819c1c6fb4788a81db4f413ae9ac, type: 2}
+  lampBody: {fileID: 21300000, guid: 3fb9b19c401af4b5b975525a624064ee, type: 3}
+  lampArrow: {fileID: 21300000, guid: 8f83e458df6144e958717b13a3b89dcd, type: 3}
+  pillarLow: {fileID: 21300000, guid: 59e9dc49dfa15494b9e107cbe8fee81d, type: 3}
+  pillarMedium: {fileID: 21300000, guid: 5d8eab655710146ccb467c2c727b9742, type: 3}
+  pillarHigh: {fileID: 21300000, guid: 7f69a0b520f7c4482a9587b41fcac4d7, type: 3}
+  channelCircle: {fileID: 21300000, guid: ce4c282ff18bb4751b27a4817f943c6c, type: 3}
+  channelTriangle: {fileID: 21300000, guid: 24b5ee7df79ff41de8a0be0809f27ab4, type: 3}
+  channelStar: {fileID: 21300000, guid: d95b83e2e93db4a14a9010831d789aed, type: 3}
+  channelDiamond: {fileID: 21300000, guid: 8a2c33762cbe54147869760d4f11ee53, type: 3}
+  panel: {fileID: 21300000, guid: e34004078407847dca473a56196fd2c3, type: 3}
+  panelLight: {fileID: 21300000, guid: 598aa836d69a14dd1bb119abd81374b2, type: 3}
+  buttonPrimary: {fileID: 21300000, guid: acfb95f1d7f384fb9aa9c7303be6f69a, type: 3}
+  buttonSecondary: {fileID: 21300000, guid: 4924fa65c2d9a4de9b99d6b8224240ea, type: 3}
+  buttonFocus: {fileID: 21300000, guid: 45713d9c32b7343af885ddef7e3c9798, type: 3}
+  worldCardFrame: {fileID: 21300000, guid: 9ab6f1fbbce7e4fc2892b55e179a2325, type: 3}
+  keyCap: {fileID: 21300000, guid: 9eb61aad2520041c883122d7ddd235eb, type: 3}
+  iconPause: {fileID: 21300000, guid: 5333d6d46994446c8823b31f9379bcf0, type: 3}
+  iconDoor: {fileID: 21300000, guid: c8fa29c0be2c44db996c8b560971378f, type: 3}
+  iconFlower: {fileID: 21300000, guid: 52060503c056c4367a73a16bbf2c6e2e, type: 3}
+  iconRetry: {fileID: 21300000, guid: 3ad766e9443774c24bf5b5a9e4dd6b95, type: 3}
+  iconWorldMap: {fileID: 21300000, guid: 075062e4bb89d4988a3823d920225be4, type: 3}
+  iconLock: {fileID: 21300000, guid: c974b6ba983704418a377e2196549fe5, type: 3}
+  iconCheck: {fileID: 21300000, guid: d113955a0bd1b43da98a199db8d91d27, type: 3}
+  iconDanger: {fileID: 21300000, guid: ccfb7b6df12cf4c929ff617a86b47788, type: 3}

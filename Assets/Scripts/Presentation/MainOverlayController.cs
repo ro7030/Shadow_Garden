@@ -246,29 +246,95 @@ namespace ShadowGarden.Presentation
             trt.anchorMin = trt.anchorMax = new Vector2(0.5f, 0.5f);
             trt.sizeDelta = new Vector2(UiTheme.ButtonMinHeight, UiTheme.ButtonMinHeight);
             trt.anchoredPosition = anchored;
-            toggleGo.GetComponent<Image>().color = UiTheme.Navy;
-            return toggleGo.GetComponent<Toggle>();
+            var background = toggleGo.GetComponent<Image>();
+            background.sprite = PresentationAssetLibrary.Catalog?.buttonSecondary;
+            background.type = background.sprite != null ? Image.Type.Sliced : Image.Type.Simple;
+            background.color = Color.white;
+
+            var checkGo = new GameObject("Checkmark", typeof(RectTransform), typeof(Image));
+            checkGo.transform.SetParent(toggleGo.transform, false);
+            var checkRt = checkGo.GetComponent<RectTransform>();
+            checkRt.anchorMin = checkRt.anchorMax = new Vector2(0.5f, 0.5f);
+            checkRt.sizeDelta = new Vector2(28f, 28f);
+            var check = checkGo.GetComponent<Image>();
+            check.sprite = PresentationAssetLibrary.Catalog?.iconCheck;
+            check.color = UiTheme.Mint;
+            check.preserveAspect = true;
+            check.raycastTarget = false;
+
+            var toggle = toggleGo.GetComponent<Toggle>();
+            toggle.targetGraphic = background;
+            toggle.graphic = check;
+            var colors = toggle.colors;
+            colors.normalColor = Color.white;
+            colors.highlightedColor = new Color(0.92f, 1f, 0.98f, 1f);
+            colors.selectedColor = new Color(0.92f, 1f, 0.98f, 1f);
+            colors.pressedColor = new Color(0.82f, 0.92f, 0.9f, 1f);
+            toggle.colors = colors;
+            return toggle;
         }
 
         private static Slider CreateSlider(Transform parent, string name, Vector2 anchored)
         {
-            var go = new GameObject(name, typeof(RectTransform), typeof(Slider), typeof(Image));
+            var go = new GameObject(name, typeof(RectTransform), typeof(Slider));
             go.transform.SetParent(parent, false);
             var rt = go.GetComponent<RectTransform>();
             rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
-            rt.sizeDelta = new Vector2(280f, 28f);
+            rt.sizeDelta = new Vector2(280f, 36f);
             rt.anchoredPosition = anchored;
-            go.GetComponent<Image>().color = UiTheme.NavyDeep;
+
+            var backgroundGo = new GameObject("Track", typeof(RectTransform), typeof(Image));
+            backgroundGo.transform.SetParent(go.transform, false);
+            var backgroundRt = backgroundGo.GetComponent<RectTransform>();
+            backgroundRt.anchorMin = new Vector2(0f, 0.5f);
+            backgroundRt.anchorMax = new Vector2(1f, 0.5f);
+            backgroundRt.offsetMin = new Vector2(0f, -7f);
+            backgroundRt.offsetMax = new Vector2(0f, 7f);
+            var background = backgroundGo.GetComponent<Image>();
+            background.sprite = PresentationAssetLibrary.Catalog?.buttonPrimary;
+            background.type = background.sprite != null ? Image.Type.Sliced : Image.Type.Simple;
+            background.color = new Color(1f, 1f, 1f, 0.78f);
+
+            var fillArea = new GameObject("FillArea", typeof(RectTransform));
+            fillArea.transform.SetParent(go.transform, false);
+            var fillAreaRt = fillArea.GetComponent<RectTransform>();
+            fillAreaRt.anchorMin = new Vector2(0f, 0.5f);
+            fillAreaRt.anchorMax = new Vector2(1f, 0.5f);
+            fillAreaRt.offsetMin = new Vector2(5f, -5f);
+            fillAreaRt.offsetMax = new Vector2(-5f, 5f);
+
+            var fill = new GameObject("Fill", typeof(RectTransform), typeof(Image));
+            fill.transform.SetParent(fillArea.transform, false);
+            UiFactory.StretchFull(fill);
+            var fillImage = fill.GetComponent<Image>();
+            fillImage.color = UiTheme.Mint;
+            fillImage.raycastTarget = false;
+
+            var handleArea = new GameObject("HandleSlideArea", typeof(RectTransform));
+            handleArea.transform.SetParent(go.transform, false);
+            var handleAreaRt = handleArea.GetComponent<RectTransform>();
+            handleAreaRt.anchorMin = Vector2.zero;
+            handleAreaRt.anchorMax = Vector2.one;
+            handleAreaRt.offsetMin = new Vector2(10f, 0f);
+            handleAreaRt.offsetMax = new Vector2(-10f, 0f);
+
+            var handle = new GameObject("Handle", typeof(RectTransform), typeof(Image));
+            handle.transform.SetParent(handleArea.transform, false);
+            var handleRt = handle.GetComponent<RectTransform>();
+            handleRt.sizeDelta = new Vector2(28f, 34f);
+            var handleImage = handle.GetComponent<Image>();
+            handleImage.sprite = PresentationAssetLibrary.Catalog?.keyCap;
+            handleImage.type = handleImage.sprite != null ? Image.Type.Sliced : Image.Type.Simple;
+            handleImage.color = UiTheme.Ivory;
+
             var slider = go.GetComponent<Slider>();
             slider.minValue = 0f;
             slider.maxValue = 1f;
             slider.value = 1f;
-
-            var fill = new GameObject("Fill", typeof(RectTransform), typeof(Image));
-            fill.transform.SetParent(go.transform, false);
-            UiFactory.StretchFull(fill);
-            fill.GetComponent<Image>().color = UiTheme.Mint;
             slider.fillRect = fill.GetComponent<RectTransform>();
+            slider.handleRect = handleRt;
+            slider.targetGraphic = handleImage;
+            slider.direction = Slider.Direction.LeftToRight;
             return slider;
         }
 

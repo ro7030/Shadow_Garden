@@ -19,6 +19,7 @@ namespace ShadowGarden.Presentation
         [SerializeField] private MainGameplayHost gameplayHost;
         [SerializeField] private MainFlowScreens flowScreens;
         [SerializeField] private MainOverlayController overlay;
+        [SerializeField] private MainScreenArtDecorator screenArt;
         [SerializeField] private Canvas mainCanvas;
         [SerializeField] private bool usePlayerPrefs = true;
 
@@ -52,6 +53,7 @@ namespace ShadowGarden.Presentation
             EnsureGameplayHost();
             EnsureFlowScreens();
             EnsureOverlay();
+            EnsureScreenArt();
 
             _flow = new GameFlowController(AppState.Title);
             _flow.StateChanged += OnStateChanged;
@@ -75,6 +77,7 @@ namespace ShadowGarden.Presentation
             gameplayHost?.Bind(this);
             flowScreens?.Bind(this, screenRouter);
             overlay?.Bind(this, mainCanvas != null ? mainCanvas.transform : null);
+            screenArt?.Bind(this, screenRouter);
         }
 
         private void Start()
@@ -82,6 +85,8 @@ namespace ShadowGarden.Presentation
             BootInitialState();
             flowScreens?.RefreshTitleBranch();
             flowScreens?.RefreshWorldMapUnlock();
+            // Flow refreshes may rebuild or reparent controls; layout is always the last step.
+            screenArt?.ApplyLayout(CurrentState);
         }
 
         private void OnDestroy()
@@ -132,6 +137,8 @@ namespace ShadowGarden.Presentation
             {
                 overlay?.Bind(this, mainCanvas.transform);
             }
+            EnsureScreenArt();
+            screenArt?.Bind(this, screenRouter);
         }
 
         public AppStateChangeResult RequestState(AppState to)
@@ -212,6 +219,7 @@ namespace ShadowGarden.Presentation
         public void ApplyUiPreferences()
         {
             gameplayHost?.PlayHud?.ApplyPreferences();
+            gameplayHost?.ApplyAudioPreferences();
             gameplayHost?.ApplyReduceMotion(
                 _save?.Preferences != null && _save.Preferences.reduceMotion);
         }
@@ -392,8 +400,13 @@ namespace ShadowGarden.Presentation
 
             if (to == AppState.GameOver || to == AppState.Cleared || to == AppState.Ending)
             {
+                gameplayHost?.PlayHud?.SetVisible(false);
                 flowScreens?.RefreshModalForState(to);
             }
+
+            // One explicit owner guarantees deterministic layout after every refresh,
+            // including Ending -> Title and repeated Opening playback.
+            screenArt?.ApplyLayout(to);
         }
 
         private void EnsureCanvas()
@@ -458,6 +471,15 @@ namespace ShadowGarden.Presentation
             if (mainCanvas == null)
             {
                 EnsureCanvas();
+            }
+        }
+
+        private void EnsureScreenArt()
+        {
+            if (screenArt == null)
+            {
+                screenArt = GetComponent<MainScreenArtDecorator>() ??
+                            gameObject.AddComponent<MainScreenArtDecorator>();
             }
         }
 

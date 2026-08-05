@@ -1,3 +1,5 @@
+using System.Collections;
+using System.Collections.Generic;
 using ShadowGarden.Core;
 using TMPro;
 using UnityEngine;
@@ -5,440 +7,514 @@ using UnityEngine;
 namespace ShadowGarden.Presentation
 {
     /// <summary>
-    /// 시험의 정원 board: cream tiles, deep navy shadows, pulsing ×2 abyss, brass lamps.
+    /// Pure presentation of a solved board. It consumes Core state and shared authored sprites;
+    /// it never creates textures/materials or recomputes shadow rules.
     /// </summary>
     public sealed class BoardPresenter : MonoBehaviour
     {
+        private const int BackgroundOrder = -100;
+        private const int FrameOrder = -40;
+        private const int BoardOrder = 0;
+        private const int ShadowOrder = 20;
+        private const int ObjectOrder = 40;
+        private const int MarkOrder = 60;
+        private const int FrontDecorOrder = 82;
+
         [SerializeField] private Transform cellRoot;
         [SerializeField] private bool showDebugCounts;
 
         private SpriteRenderer[,] _cells;
         private SpriteRenderer[,] _overlays;
-        private TextMeshPro[,] _labels;
-        private TextMeshPro[,] _arrows;
+        private SpriteRenderer[,] _objects;
+        private SpriteRenderer[,] _channelMarks;
+        private SpriteRenderer[,] _directionMarks;
+        private TextMeshPro[,] _debugLabels;
         private Transform[,] _pillars;
         private GridSize _size;
-        private Sprite _quad;
-        private Sprite _softQuad;
-        private readonly System.Collections.Generic.List<(Transform t, Vector3 baseScale)> _pulseTargets =
-            new System.Collections.Generic.List<(Transform, Vector3)>();
+        private InGameAssetCatalogAsset _catalog;
+        private WorldArtSetAsset _world;
+        private Sprite _fallbackSprite;
+        private SpriteRenderer _goalRenderer;
+        private SpriteRenderer _environmentReactionRenderer;
+        private Coroutine _environmentReactionRoutine;
+        private readonly List<(Transform target, Vector3 baseScale)> _pulseTargets = new();
         private bool _reduceMotion;
 
         public void SetReduceMotion(bool enabled) => _reduceMotion = enabled;
+        public void SetShowDebugCounts(bool enabled) => showDebugCounts = enabled;
 
         public void Build(StageDefinition stage)
         {
+            if (stage == null) return;
             _size = stage.BoardSize;
+            _catalog = PresentationAssetLibrary.Catalog;
+            _world = PresentationAssetLibrary.ForStage(stage.StageId);
+            _fallbackSprite = ResolveFallbackSprite();
             Clear();
             EnsureRoot();
-            _quad = CreateRoundedSprite(0.18f);
-            _softQuad = CreateRoundedSprite(0.28f);
+
             _cells = new SpriteRenderer[_size.Width, _size.Height];
             _overlays = new SpriteRenderer[_size.Width, _size.Height];
-            _labels = new TextMeshPro[_size.Width, _size.Height];
-            _arrows = new TextMeshPro[_size.Width, _size.Height];
+            _objects = new SpriteRenderer[_size.Width, _size.Height];
+            _channelMarks = new SpriteRenderer[_size.Width, _size.Height];
+            _directionMarks = new SpriteRenderer[_size.Width, _size.Height];
+            _debugLabels = new TextMeshPro[_size.Width, _size.Height];
             _pillars = new Transform[_size.Width, _size.Height];
             _pulseTargets.Clear();
+            _goalRenderer = null;
+            _environmentReactionRenderer = null;
 
-            BuildSkyBackdrop();
-            BuildBoardFrame();
-
+            BuildEnvironment();
             for (var y = 0; y < _size.Height; y++)
             {
                 for (var x = 0; x < _size.Width; x++)
                 {
-                    var pos = new GridPosition(x, y);
-                    var cell = new GameObject($"Cell_{x}_{y}");
-                    cell.transform.SetParent(cellRoot, false);
-                    cell.transform.localPosition = GridWorld.ToWorld(pos);
-                    cell.transform.localScale = Vector3.one * 0.90f;
-
-                    var baseRenderer = cell.AddComponent<SpriteRenderer>();
-                    baseRenderer.sprite = _quad;
-                    baseRenderer.sortingOrder = 0;
-                    _cells[x, y] = baseRenderer;
-
-                    var overlayGo = new GameObject("Overlay");
-                    overlayGo.transform.SetParent(cell.transform, false);
-                    overlayGo.transform.localScale = Vector3.one * 0.96f;
-                    var overlay = overlayGo.AddComponent<SpriteRenderer>();
-                    overlay.sprite = _softQuad;
-                    overlay.sortingOrder = 1;
-                    overlay.enabled = false;
-                    _overlays[x, y] = overlay;
-
-                    var label = CreateLabel(cell.transform, "Label", 0.16f, new Vector3(0f, -0.26f, -0.05f));
-                    _labels[x, y] = label;
-
-                    // Keep lamp direction arrows smaller than channel glyphs so they read as cues, not labels.
-                    var arrow = CreateLabel(cell.transform, "Arrow", 0.11f, new Vector3(0f, 0.20f, -0.05f));
-                    _arrows[x, y] = arrow;
-
-                    if (stage.IsPillar(pos))
-                    {
-                        _pillars[x, y] = CreatePillar(cell.transform, FindPillar(stage, pos));
-                    }
+                    BuildCell(stage, new GridPosition(x, y));
                 }
             }
         }
 
         public void Render(StageDefinition stage, ShadowGridResult shadows, StageRuntimeState state)
         {
-            if (_cells == null)
+            if (stage == null || shadows == null || state == null) return;
+            if (_cells == null || _size.Width != stage.BoardSize.Width || _size.Height != stage.BoardSize.Height)
             {
                 Build(stage);
             }
 
             _pulseTargets.Clear();
-
             for (var y = 0; y < _size.Height; y++)
             {
                 for (var x = 0; x < _size.Width; x++)
                 {
                     var pos = new GridPosition(x, y);
                     var kind = CellClassifier.Classify(stage, shadows, pos);
-                    var cell = _cells[x, y];
+                    var baseRenderer = _cells[x, y];
                     var overlay = _overlays[x, y];
-                    var label = _labels[x, y];
-                    var arrow = _arrows[x, y];
+                    var objectRenderer = _objects[x, y];
+                    var channel = _channelMarks[x, y];
+                    var arrow = _directionMarks[x, y];
+                    var debug = _debugLabels[x, y];
 
-                    cell.transform.localScale = Vector3.one * 0.90f;
-                    cell.color = BaseColor(stage, pos, kind);
+                    baseRenderer.sprite = BaseSprite(stage, pos);
+                    baseRenderer.color = _world != null ? _world.safeTint : Color.white;
                     overlay.enabled = false;
-                    label.text = string.Empty;
-                    arrow.text = string.Empty;
+                    overlay.color = Color.white;
+                    if (debug != null)
+                    {
+                        debug.text = string.Empty;
+                        debug.gameObject.SetActive(false);
+                    }
 
                     if (stage.IsPillar(pos))
                     {
-                        if (TryFindPillar(stage, pos, out var pillar))
-                        {
-                            label.text = MockupPalette.ChannelGlyph(pillar.Channel);
-                            label.color = MockupPalette.ChannelColor(pillar.Channel);
-                            label.transform.localPosition = new Vector3(0f, -0.38f, -0.05f);
-                        }
-
                         continue;
                     }
 
                     if (stage.IsLamp(pos) && stage.TryGetLampAt(pos, out var lamp))
                     {
-                        cell.color = MockupPalette.LampGold;
-                        overlay.enabled = true;
-                        overlay.color = new Color(
-                            MockupPalette.LampBrass.r,
-                            MockupPalette.LampBrass.g,
-                            MockupPalette.LampBrass.b,
-                            0.35f);
-                        var direction = state.DirectionByChannel[lamp.Channel];
-                        arrow.text = MockupPalette.DirectionArrow(direction);
-                        arrow.color = MockupPalette.ChannelColor(lamp.Channel);
-                        label.text = MockupPalette.ChannelGlyph(lamp.Channel);
-                        label.color = MockupPalette.ChannelColor(lamp.Channel);
+                        if (objectRenderer != null)
+                        {
+                            objectRenderer.sprite = _catalog != null ? _catalog.lampBody : _fallbackSprite;
+                            objectRenderer.color = Color.white;
+                        }
+
+                        if (channel != null)
+                        {
+                            channel.sprite = ChannelSprite(lamp.Channel);
+                            channel.color = MockupPalette.ChannelColor(lamp.Channel);
+                            channel.enabled = channel.sprite != null;
+                        }
+
+                        if (arrow != null)
+                        {
+                            arrow.sprite = _catalog != null ? _catalog.lampArrow : null;
+                            arrow.color = MockupPalette.ChannelColor(lamp.Channel);
+                            arrow.transform.localRotation = DirectionRotation(state.DirectionByChannel[lamp.Channel]);
+                            arrow.enabled = arrow.sprite != null;
+                        }
+
                         continue;
                     }
 
                     if (stage.IsGoal(pos))
                     {
-                        cell.color = stage.ClearGoalType == ClearGoalType.ExitDoor
-                            ? MockupPalette.ExitCyan
-                            : MockupPalette.NightFlower;
-                        label.text = stage.ClearGoalType == ClearGoalType.ExitDoor ? "⌂" : "❀";
-                        label.color = Color.white;
-                        label.fontSize = 0.22f * 36f;
-                        label.transform.localPosition = new Vector3(0f, 0.02f, -0.05f);
+                        if (objectRenderer != null)
+                        {
+                            objectRenderer.sprite = stage.ClearGoalType == ClearGoalType.ExitDoor
+                                ? _world?.doorClosed ?? _fallbackSprite
+                                : _world?.flowerClosed ?? _fallbackSprite;
+                            objectRenderer.color = Color.white;
+                        }
+
                         continue;
                     }
 
-                    if (kind == CellKind.SingleShadow)
+                    switch (kind)
                     {
-                        cell.color = MockupPalette.SingleShadow;
-                        if (showDebugCounts)
-                        {
-                            label.text = "1";
-                            label.color = new Color(1f, 1f, 1f, 0.55f);
-                        }
-                    }
-                    else if (kind == CellKind.OverlapHazard)
-                    {
-                        cell.color = MockupPalette.OverlapHazard;
-                        overlay.enabled = true;
-                        overlay.color = new Color(
-                            MockupPalette.OverlapCoral.r,
-                            MockupPalette.OverlapCoral.g,
-                            MockupPalette.OverlapCoral.b,
-                            0.42f);
-                        label.text = "×2";
-                        label.color = new Color(1f, 0.78f, 0.72f, 1f);
-                        label.fontSize = 0.18f * 36f;
-                        _pulseTargets.Add((cell.transform, Vector3.one * 0.90f));
-                    }
-                    else if (kind == CellKind.Cliff)
-                    {
-                        cell.color = MockupPalette.Cliff;
-                        overlay.enabled = true;
-                        overlay.color = MockupPalette.CliffRim;
-                        overlay.transform.localScale = Vector3.one * 1.05f;
-                    }
-                    else if (stage.IsAlwaysSafe(pos))
-                    {
-                        cell.color = MockupPalette.SafeTerrain;
+                        case CellKind.SingleShadow:
+                            overlay.enabled = true;
+                            overlay.sprite = _catalog?.gameplayFx?.singleShadow ?? _fallbackSprite;
+                            overlay.color = _world != null ? _world.shadowTint : MockupPalette.SingleShadow;
+                            ShowCount(debug, "1", new Color(1f, 1f, 1f, 0.58f));
+                            break;
+                        case CellKind.OverlapHazard:
+                            overlay.enabled = true;
+                            overlay.sprite = _catalog?.gameplayFx?.overlapHazard ?? _fallbackSprite;
+                            overlay.color = Color.white;
+                            _pulseTargets.Add((overlay.transform, Vector3.one * 0.94f));
+                            ShowCount(debug, "2+", UiTheme.Coral);
+                            break;
+                        case CellKind.Cliff:
+                            overlay.enabled = true;
+                            overlay.sprite = _world?.cliffTile ?? _catalog?.gameplayFx?.cliffRim ?? _fallbackSprite;
+                            overlay.color = Color.white;
+                            break;
                     }
                 }
             }
         }
 
-        private void LateUpdate()
-        {
-            if (_pulseTargets.Count == 0)
-            {
-                return;
-            }
-
-            if (_reduceMotion)
-            {
-                for (var i = 0; i < _pulseTargets.Count; i++)
-                {
-                    var (t, baseScale) = _pulseTargets[i];
-                    if (t != null)
-                    {
-                        t.localScale = baseScale;
-                    }
-                }
-
-                return;
-            }
-
-            var pulse = 1f + Mathf.Sin(Time.unscaledTime * 3.2f) * 0.045f;
-            var alphaPulse = 0.38f + Mathf.Sin(Time.unscaledTime * 3.2f) * 0.10f;
-            for (var i = 0; i < _pulseTargets.Count; i++)
-            {
-                var (t, baseScale) = _pulseTargets[i];
-                if (t == null)
-                {
-                    continue;
-                }
-
-                t.localScale = baseScale * pulse;
-                var overlay = t.Find("Overlay");
-                if (overlay != null)
-                {
-                    var sr = overlay.GetComponent<SpriteRenderer>();
-                    if (sr != null && sr.enabled)
-                    {
-                        var c = sr.color;
-                        c.a = alphaPulse;
-                        sr.color = c;
-                    }
-                }
-            }
-        }
-
-        public void SetShowDebugCounts(bool enabled)
-        {
-            showDebugCounts = enabled;
-        }
-
-        /// <summary>
-        /// Short visual reaction on pillars belonging to the approached lamp channel.
-        /// Presentation-only — does not change Core shadow counts.
-        /// </summary>
         public void PulseChannelPillars(StageDefinition stage, ChannelId channel, float durationSeconds = 0.3f)
         {
-            if (stage == null || _pillars == null)
-            {
-                return;
-            }
-
+            if (stage == null || _pillars == null) return;
             StopCoroutine(nameof(PulseChannelRoutine));
             StartCoroutine(PulseChannelRoutine(stage, channel, durationSeconds));
         }
 
+        public void PlayEnvironmentReaction(float durationSeconds = 0.48f)
+        {
+            if (_environmentReactionRenderer == null || _world?.environmentReaction == null) return;
+            if (_environmentReactionRoutine != null) StopCoroutine(_environmentReactionRoutine);
+            _environmentReactionRoutine = StartCoroutine(EnvironmentReactionRoutine(durationSeconds));
+        }
+
         public Coroutine PlayDoorOpen(StageDefinition stage, float durationSeconds)
         {
-            if (stage == null || stage.ClearGoalType != ClearGoalType.ExitDoor)
-            {
-                return null;
-            }
-
-            return StartCoroutine(DoorOpenRoutine(stage.GoalPosition, durationSeconds));
+            if (stage == null || stage.ClearGoalType != ClearGoalType.ExitDoor || _goalRenderer == null) return null;
+            return StartCoroutine(DoorOpenRoutine(durationSeconds));
         }
 
-        private System.Collections.IEnumerator PulseChannelRoutine(
-            StageDefinition stage,
-            ChannelId channel,
-            float duration)
+        public Coroutine PlayFlowerBloom(StageDefinition stage, float durationSeconds)
         {
-            var targets = new System.Collections.Generic.List<Transform>();
-            foreach (var pillar in stage.Pillars)
+            if (stage == null || stage.ClearGoalType != ClearGoalType.NightFlower || _goalRenderer == null) return null;
+            return StartCoroutine(FlowerBloomRoutine(durationSeconds));
+        }
+
+        private void LateUpdate()
+        {
+            if (_pulseTargets.Count == 0) return;
+            var pulse = _reduceMotion ? 1f : 1f + Mathf.Sin(Time.unscaledTime * 3.2f) * 0.045f;
+            foreach (var (target, baseScale) in _pulseTargets)
             {
-                if (pillar.Channel != channel)
-                {
-                    continue;
-                }
-
-                var t = _pillars[pillar.Position.X, pillar.Position.Y];
-                if (t != null)
-                {
-                    targets.Add(t);
-                }
-            }
-
-            var elapsed = 0f;
-            while (elapsed < duration)
-            {
-                elapsed += Time.unscaledDeltaTime;
-                var wave = 1f + Mathf.Sin(elapsed * 18f) * 0.08f;
-                for (var i = 0; i < targets.Count; i++)
-                {
-                    if (targets[i] != null)
-                    {
-                        targets[i].localScale = Vector3.one * wave;
-                    }
-                }
-
-                yield return null;
-            }
-
-            for (var i = 0; i < targets.Count; i++)
-            {
-                if (targets[i] != null)
-                {
-                    targets[i].localScale = Vector3.one;
-                }
+                if (target != null) target.localScale = baseScale * pulse;
             }
         }
 
-        private System.Collections.IEnumerator DoorOpenRoutine(GridPosition goal, float duration)
+        private void BuildCell(StageDefinition stage, GridPosition pos)
         {
-            if (_labels == null || !_size.Contains(goal))
+            var x = pos.X;
+            var y = pos.Y;
+            var cell = new GameObject($"Cell_{x}_{y}");
+            cell.transform.SetParent(cellRoot, false);
+            cell.transform.localPosition = GridWorld.ToWorld(pos);
+
+            var baseRenderer = CreateRenderer(cell.transform, "Base", BoardOrder, Vector3.one * 0.94f);
+            _cells[x, y] = baseRenderer;
+            var overlay = CreateRenderer(cell.transform, "ShadowState", ShadowOrder, Vector3.one * 0.94f);
+            overlay.enabled = false;
+            _overlays[x, y] = overlay;
+
+            var objectRenderer = CreateRenderer(cell.transform, "GameplayObject", ObjectOrder + y * 2, Vector3.one);
+            _objects[x, y] = objectRenderer;
+            var channel = CreateRenderer(cell.transform, "ChannelMark", MarkOrder + y * 2, Vector3.one * 0.30f);
+            channel.transform.localPosition = new Vector3(-0.29f, -0.31f, 0f);
+            channel.enabled = false;
+            _channelMarks[x, y] = channel;
+            var direction = CreateRenderer(cell.transform, "DirectionMark", MarkOrder + y * 2 + 1, Vector3.one * 0.35f);
+            direction.transform.localPosition = new Vector3(0.27f, 0.30f, 0f);
+            direction.enabled = false;
+            _directionMarks[x, y] = direction;
+            _debugLabels[x, y] = CreateDebugLabel(cell.transform);
+
+            if (stage.IsPillar(pos) && TryFindPillar(stage, pos, out var pillar))
             {
-                yield break;
+                objectRenderer.sprite = _catalog?.GetPillar(pillar.Height) ?? _fallbackSprite;
+                objectRenderer.color = Color.white;
+                channel.sprite = ChannelSprite(pillar.Channel);
+                channel.color = MockupPalette.ChannelColor(pillar.Channel);
+                channel.enabled = channel.sprite != null;
+                _pillars[x, y] = objectRenderer.transform;
+            }
+            else if (stage.IsLamp(pos))
+            {
+                objectRenderer.sprite = _catalog?.lampBody ?? _fallbackSprite;
+            }
+            else if (stage.IsGoal(pos))
+            {
+                objectRenderer.sprite = stage.ClearGoalType == ClearGoalType.ExitDoor
+                    ? _world?.doorClosed ?? _fallbackSprite
+                    : _world?.flowerClosed ?? _fallbackSprite;
+                _goalRenderer = objectRenderer;
+            }
+            else
+            {
+                objectRenderer.enabled = false;
+            }
+        }
+
+        private void BuildEnvironment()
+        {
+            var background = CreateRenderer(cellRoot, "WorldBackground", BackgroundOrder, Vector3.one);
+            background.sprite = _world?.background ?? _fallbackSprite;
+            background.color = _world != null ? _world.ambientTint : Color.white;
+            background.transform.localPosition = GridWorld.BoardCenter(_size) + new Vector3(0f, 0.15f, 0f);
+            // The expanded-board camera reserves extra HUD/object headroom. Overscan the
+            // authored 16:9 background so the camera clear color never appears as side bars.
+            FitSprite(background, _size.Width + 10f, _size.Height + 8f, cover: true);
+
+            var frame = CreateRenderer(cellRoot, "BoardFrame", FrameOrder, Vector3.one);
+            frame.sprite = _world?.boardFrame ?? _fallbackSprite;
+            frame.color = new Color(1f, 1f, 1f, 0.92f);
+            frame.transform.localPosition = GridWorld.BoardCenter(_size);
+            FitSprite(frame, _size.Width + 1.05f, _size.Height + 1.05f, cover: true);
+
+            var voidPad = CreateRenderer(cellRoot, "BoardVoid", FrameOrder + 1, Vector3.one);
+            voidPad.sprite = _world?.boardVoid ?? _fallbackSprite;
+            voidPad.color = new Color(0.18f, 0.18f, 0.23f, 0.96f);
+            voidPad.transform.localPosition = GridWorld.BoardCenter(_size);
+            FitSprite(voidPad, _size.Width + 0.38f, _size.Height + 0.38f, cover: true);
+            BuildDecor();
+        }
+
+        private void BuildDecor()
+        {
+            if (_world == null) return;
+            var center = GridWorld.BoardCenter(_size);
+            var positions = new[]
+            {
+                center + new Vector3(-_size.Width * 0.48f, _size.Height * 0.5f + 0.4f, 0f),
+                center + new Vector3(_size.Width * 0.48f, _size.Height * 0.5f + 0.2f, 0f),
+                center + new Vector3(-_size.Width * 0.48f, -_size.Height * 0.5f - 0.25f, 0f)
+            };
+            for (var i = 0; i < positions.Length; i++)
+            {
+                var sprite = _world.backDecor != null && i < _world.backDecor.Length ? _world.backDecor[i] : null;
+                if (sprite == null) continue;
+                var decor = CreateRenderer(cellRoot, $"BackDecor_{i}", FrameOrder + 2, Vector3.one * 0.75f);
+                decor.sprite = sprite;
+                decor.transform.localPosition = positions[i];
             }
 
-            var label = _labels[goal.X, goal.Y];
-            var cell = _cells[goal.X, goal.Y];
+            var frontPositions = new[]
+            {
+                center + new Vector3(-_size.Width * 0.43f, -_size.Height * 0.5f - 0.42f, 0f),
+                center + new Vector3(_size.Width * 0.43f, -_size.Height * 0.5f - 0.38f, 0f),
+                center + new Vector3(0f, -_size.Height * 0.5f - 0.58f, 0f)
+            };
+            for (var i = 0; i < frontPositions.Length; i++)
+            {
+                var sprite = _world.frontDecor != null && i < _world.frontDecor.Length ? _world.frontDecor[i] : null;
+                if (sprite == null) continue;
+                var decor = CreateRenderer(cellRoot, $"FrontDecor_{i}", FrontDecorOrder + i, Vector3.one * 0.72f);
+                decor.sprite = sprite;
+                decor.transform.localPosition = frontPositions[i];
+            }
+
+            if (_world.environmentReaction != null)
+            {
+                _environmentReactionRenderer = CreateRenderer(
+                    cellRoot,
+                    "EnvironmentReaction",
+                    FrontDecorOrder + 4,
+                    Vector3.one * 0.8f);
+                _environmentReactionRenderer.sprite = _world.environmentReaction;
+                _environmentReactionRenderer.color = new Color(
+                    _world.reactionTint.r,
+                    _world.reactionTint.g,
+                    _world.reactionTint.b,
+                    0f);
+                _environmentReactionRenderer.transform.localPosition =
+                    center + new Vector3(0f, -_size.Height * 0.5f - 0.12f, 0f);
+                _environmentReactionRenderer.gameObject.SetActive(false);
+            }
+        }
+
+        private IEnumerator EnvironmentReactionRoutine(float durationSeconds)
+        {
+            var renderer = _environmentReactionRenderer;
+            if (renderer == null) yield break;
+            renderer.gameObject.SetActive(true);
+            var duration = Mathf.Max(0.08f, durationSeconds);
             var elapsed = 0f;
-            var startColor = cell != null ? cell.color : Color.cyan;
+            var basePosition = renderer.transform.localPosition;
             while (elapsed < duration)
             {
                 elapsed += Time.unscaledDeltaTime;
                 var t = Mathf.Clamp01(elapsed / duration);
-                if (label != null)
+                var wave = Mathf.Sin(t * Mathf.PI);
+                var tint = _world != null ? _world.reactionTint : Color.white;
+                tint.a *= _reduceMotion ? 0.72f : wave;
+                renderer.color = tint;
+                if (!_reduceMotion)
                 {
-                    label.text = t < 0.5f ? "⌂" : "열린 문";
-                    label.color = Color.Lerp(Color.cyan, Color.white, t);
+                    var world = _world != null ? _world.worldNumber : 1;
+                    renderer.transform.localScale = world switch
+                    {
+                        2 => new Vector3(Mathf.Lerp(0.72f, 1.1f, t), 0.82f, 1f),
+                        3 => Vector3.one * (0.78f + wave * 0.16f),
+                        _ => Vector3.one * (0.78f + t * 0.18f)
+                    };
+                    renderer.transform.localPosition = world == 2
+                        ? basePosition + Vector3.right * Mathf.Lerp(-0.2f, 0.2f, t)
+                        : basePosition;
                 }
-
-                if (cell != null)
-                {
-                    cell.color = Color.Lerp(startColor, new Color(0.75f, 0.95f, 1f, 1f), t);
-                }
-
                 yield return null;
             }
+            renderer.gameObject.SetActive(false);
+            renderer.transform.localPosition = basePosition;
+            renderer.transform.localScale = Vector3.one * 0.8f;
+            _environmentReactionRoutine = null;
         }
 
-        private void BuildSkyBackdrop()
+        private IEnumerator PulseChannelRoutine(StageDefinition stage, ChannelId channel, float duration)
         {
-            var sky = new GameObject("SkyBackdrop");
-            sky.transform.SetParent(cellRoot, false);
-            sky.transform.localPosition = GridWorld.BoardCenter(_size) + new Vector3(0f, 0.2f, 1.2f);
-            sky.transform.localScale = new Vector3(_size.Width + 6.5f, _size.Height + 5.5f, 1f);
-            var renderer = sky.AddComponent<SpriteRenderer>();
-            renderer.sprite = CreateGradientSprite();
-            renderer.color = Color.white;
-            renderer.sortingOrder = -5;
-        }
-
-        private void BuildBoardFrame()
-        {
-            var voidPad = new GameObject("BoardVoidPad");
-            voidPad.transform.SetParent(cellRoot, false);
-            voidPad.transform.localPosition = GridWorld.BoardCenter(_size) + new Vector3(0f, 0f, 0.7f);
-            voidPad.transform.localScale = new Vector3(_size.Width + 0.55f, _size.Height + 0.55f, 1f);
-            var voidRenderer = voidPad.AddComponent<SpriteRenderer>();
-            voidRenderer.sprite = _quad;
-            voidRenderer.color = MockupPalette.BoardVoid;
-            voidRenderer.sortingOrder = -3;
-
-            var frame = new GameObject("BoardFrame");
-            frame.transform.SetParent(cellRoot, false);
-            frame.transform.localPosition = GridWorld.BoardCenter(_size) + new Vector3(0f, 0f, 0.85f);
-            frame.transform.localScale = new Vector3(_size.Width + 0.85f, _size.Height + 0.85f, 1f);
-            var renderer = frame.AddComponent<SpriteRenderer>();
-            renderer.sprite = _softQuad;
-            renderer.color = MockupPalette.BoardFrame;
-            renderer.sortingOrder = -4;
-        }
-
-        private Transform CreatePillar(Transform parent, PillarDefinition pillar)
-        {
-            var heightScale = pillar.Height switch
+            var targets = new List<Transform>();
+            foreach (var pillar in stage.Pillars)
             {
-                PillarHeight.Low => 0.48f,
-                PillarHeight.Medium => 0.82f,
-                PillarHeight.High => 1.22f,
-                _ => 0.82f
-            };
+                if (pillar.Channel != channel) continue;
+                var target = _pillars[pillar.Position.X, pillar.Position.Y];
+                if (target != null) targets.Add(target);
+            }
 
-            var root = new GameObject("Pillar");
-            root.transform.SetParent(parent, false);
+            var elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                var scale = _reduceMotion ? 1f : 1f + Mathf.Sin(elapsed * 18f) * 0.07f;
+                foreach (var target in targets) if (target != null) target.localScale = Vector3.one * scale;
+                yield return null;
+            }
 
-            var basePlate = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            basePlate.name = "Base";
-            basePlate.transform.SetParent(root.transform, false);
-            basePlate.transform.localPosition = new Vector3(0f, -0.12f, -0.15f);
-            basePlate.transform.localScale = new Vector3(0.42f, 0.06f, 0.42f);
-            Object.Destroy(basePlate.GetComponent<Collider>());
-            ApplyMat(basePlate, MockupPalette.LampBrass);
-
-            var shaft = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            shaft.name = "Shaft";
-            shaft.transform.SetParent(root.transform, false);
-            shaft.transform.localPosition = new Vector3(0f, 0.12f * heightScale, -0.2f);
-            shaft.transform.localScale = new Vector3(0.28f, 0.38f * heightScale, 0.28f);
-            Object.Destroy(shaft.GetComponent<Collider>());
-            ApplyMat(shaft, MockupPalette.PillarStone);
-
-            var cap = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            cap.name = "Cap";
-            cap.transform.SetParent(root.transform, false);
-            cap.transform.localPosition = new Vector3(0f, 0.12f * heightScale + 0.22f * heightScale, -0.22f);
-            cap.transform.localScale = new Vector3(0.22f, 0.14f, 0.22f);
-            Object.Destroy(cap.GetComponent<Collider>());
-            ApplyMat(cap, MockupPalette.ChannelColor(pillar.Channel) * 0.85f);
-
-            return root.transform;
+            foreach (var target in targets) if (target != null) target.localScale = Vector3.one;
         }
 
-        private static void ApplyMat(GameObject go, Color color)
+        private IEnumerator DoorOpenRoutine(float duration)
         {
-            var renderer = go.GetComponent<MeshRenderer>();
-            var mat = new Material(FindUnlit()) { color = color };
-            renderer.sharedMaterial = mat;
+            var elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                var t = Mathf.Clamp01(elapsed / Mathf.Max(0.01f, duration));
+                _goalRenderer.color = Color.Lerp(Color.white, new Color(1f, 0.93f, 0.68f, 1f), Mathf.Sin(t * Mathf.PI));
+                _goalRenderer.transform.localScale = Vector3.one * Mathf.Lerp(1f, 1.06f, t);
+                if (t >= 0.45f && _world?.doorOpen != null) _goalRenderer.sprite = _world.doorOpen;
+                yield return null;
+            }
+
+            _goalRenderer.color = Color.white;
+            _goalRenderer.transform.localScale = Vector3.one;
+            if (_world?.doorOpen != null) _goalRenderer.sprite = _world.doorOpen;
         }
 
-        private static TextMeshPro CreateLabel(Transform parent, string name, float characterSize, Vector3 localPos)
+        private IEnumerator FlowerBloomRoutine(float duration)
+        {
+            var elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                var t = Mathf.Clamp01(elapsed / Mathf.Max(0.01f, duration));
+                if (t >= 0.35f && _world?.flowerBloom != null) _goalRenderer.sprite = _world.flowerBloom;
+                var eased = t * t * (3f - 2f * t);
+                _goalRenderer.transform.localScale = Vector3.one * Mathf.Lerp(0.88f, 1.12f, eased);
+                _goalRenderer.color = Color.Lerp(new Color(0.75f, 0.8f, 1f, 0.85f), Color.white, eased);
+                yield return null;
+            }
+
+            _goalRenderer.transform.localScale = Vector3.one;
+            _goalRenderer.color = Color.white;
+            if (_world?.flowerBloom != null) _goalRenderer.sprite = _world.flowerBloom;
+        }
+
+        private Sprite BaseSprite(StageDefinition stage, GridPosition pos)
+        {
+            if (stage.IsAlwaysSafe(pos) || stage.IsPillar(pos))
+            {
+                return _world?.PickSafeTile(pos.X, pos.Y) ?? _fallbackSprite;
+            }
+
+            return _world?.boardVoid ?? _fallbackSprite;
+        }
+
+        private Sprite ChannelSprite(ChannelId channel) => _catalog?.GetChannelIcon(channel) ?? _fallbackSprite;
+
+        private Sprite ResolveFallbackSprite()
+        {
+            if (_world?.safeTile != null) return _world.safeTile;
+            if (_catalog?.panelLight != null) return _catalog.panelLight;
+            return Resources.GetBuiltinResource<Sprite>("UI/Skin/UISprite.psd");
+        }
+
+        private static SpriteRenderer CreateRenderer(
+            Transform parent,
+            string name,
+            int sortingOrder,
+            Vector3 scale)
         {
             var go = new GameObject(name);
             go.transform.SetParent(parent, false);
-            go.transform.localPosition = localPos;
+            go.transform.localScale = scale;
+            var renderer = go.AddComponent<SpriteRenderer>();
+            renderer.sortingOrder = sortingOrder;
+            return renderer;
+        }
+
+        private static TextMeshPro CreateDebugLabel(Transform parent)
+        {
+            var go = new GameObject("DebugCount");
+            go.transform.SetParent(parent, false);
             var text = go.AddComponent<TextMeshPro>();
             text.alignment = TextAlignmentOptions.Center;
-            text.fontSize = characterSize * 36f;
+            text.fontSize = 4.8f;
             text.color = Color.white;
-            text.rectTransform.sizeDelta = new Vector2(2f, 1f);
+            text.rectTransform.sizeDelta = new Vector2(1.2f, 0.5f);
+            text.transform.localPosition = new Vector3(0f, -0.28f, 0f);
+            text.sortingOrder = MarkOrder + 10;
             UiTypography.Apply(text, bold: true);
+            go.SetActive(false);
             return text;
+        }
+
+        private void ShowCount(TextMeshPro label, string value, Color color)
+        {
+            if (!showDebugCounts || label == null) return;
+            label.text = value;
+            label.color = color;
+            label.gameObject.SetActive(true);
+        }
+
+        private static Quaternion DirectionRotation(CardinalDirection direction) => direction switch
+        {
+            CardinalDirection.East => Quaternion.Euler(0f, 0f, -90f),
+            CardinalDirection.South => Quaternion.Euler(0f, 0f, 180f),
+            CardinalDirection.West => Quaternion.Euler(0f, 0f, 90f),
+            _ => Quaternion.identity
+        };
+
+        private static void FitSprite(SpriteRenderer renderer, float width, float height, bool cover)
+        {
+            if (renderer?.sprite == null) return;
+            var bounds = renderer.sprite.bounds.size;
+            if (bounds.x <= 0f || bounds.y <= 0f) return;
+            var sx = width / bounds.x;
+            var sy = height / bounds.y;
+            var uniform = cover ? Mathf.Max(sx, sy) : Mathf.Min(sx, sy);
+            renderer.transform.localScale = new Vector3(uniform, uniform, 1f);
         }
 
         private void EnsureRoot()
         {
-            if (cellRoot != null)
-            {
-                return;
-            }
-
+            if (cellRoot != null) return;
             var root = new GameObject("Cells");
             root.transform.SetParent(transform, false);
             cellRoot = root.transform;
@@ -447,110 +523,25 @@ namespace ShadowGarden.Presentation
         private void Clear()
         {
             _pulseTargets.Clear();
-            if (cellRoot == null)
-            {
-                return;
-            }
-
+            if (cellRoot == null) return;
             for (var i = cellRoot.childCount - 1; i >= 0; i--)
             {
                 var child = cellRoot.GetChild(i).gameObject;
-                if (Application.isPlaying)
-                {
-                    Object.Destroy(child);
-                }
-                else
-                {
-                    Object.DestroyImmediate(child);
-                }
+                if (Application.isPlaying) Destroy(child); else DestroyImmediate(child);
             }
-        }
-
-        private static Color BaseColor(StageDefinition stage, GridPosition pos, CellKind kind)
-        {
-            if (stage.IsAlwaysSafe(pos))
-            {
-                return MockupPalette.SafeTerrain;
-            }
-
-            return kind switch
-            {
-                CellKind.Cliff => MockupPalette.Cliff,
-                _ => MockupPalette.BoardVoid
-            };
-        }
-
-        private static PillarDefinition FindPillar(StageDefinition stage, GridPosition pos)
-        {
-            TryFindPillar(stage, pos, out var pillar);
-            return pillar;
         }
 
         private static bool TryFindPillar(StageDefinition stage, GridPosition pos, out PillarDefinition pillar)
         {
             foreach (var candidate in stage.Pillars)
             {
-                if (candidate.Position == pos)
-                {
-                    pillar = candidate;
-                    return true;
-                }
+                if (candidate.Position != pos) continue;
+                pillar = candidate;
+                return true;
             }
 
             pillar = null;
             return false;
-        }
-
-        private static Sprite CreateRoundedSprite(float cornerRatio)
-        {
-            const int size = 64;
-            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
-            var center = (size - 1) * 0.5f;
-            var corner = size * cornerRatio;
-            for (var y = 0; y < size; y++)
-            {
-                for (var x = 0; x < size; x++)
-                {
-                    var dx = Mathf.Abs(x - center);
-                    var dy = Mathf.Abs(y - center);
-                    var inside =
-                        (dx <= center - corner || dy <= center - corner) ||
-                        ((dx - (center - corner)) * (dx - (center - corner)) +
-                         (dy - (center - corner)) * (dy - (center - corner)) <= corner * corner);
-                    texture.SetPixel(x, y, inside ? Color.white : Color.clear);
-                }
-            }
-
-            texture.Apply();
-            texture.filterMode = FilterMode.Bilinear;
-            texture.wrapMode = TextureWrapMode.Clamp;
-            return Sprite.Create(texture, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
-        }
-
-        private static Sprite CreateGradientSprite()
-        {
-            const int size = 64;
-            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
-            for (var y = 0; y < size; y++)
-            {
-                var t = y / (float)(size - 1);
-                var c = Color.Lerp(MockupPalette.SoftSkyDeep, MockupPalette.SoftSky, t);
-                for (var x = 0; x < size; x++)
-                {
-                    texture.SetPixel(x, y, c);
-                }
-            }
-
-            texture.Apply();
-            texture.filterMode = FilterMode.Bilinear;
-            return Sprite.Create(texture, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
-        }
-
-        private static Shader FindUnlit()
-        {
-            return Shader.Find("Universal Render Pipeline/Unlit")
-                   ?? Shader.Find("Unlit/Color")
-                   ?? Shader.Find("Sprites/Default");
         }
     }
 }

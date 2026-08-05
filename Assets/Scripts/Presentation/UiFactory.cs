@@ -49,7 +49,11 @@ namespace ShadowGarden.Presentation
 
         public static Image CreatePanel(Transform parent, string name, Color color, Vector2 size, Vector2 anchored)
         {
-            var go = new GameObject(name, typeof(RectTransform), typeof(Image));
+            var prefab = Resources.Load<GameObject>("Presentation/Prefabs/FinalPanel");
+            var go = prefab != null
+                ? Object.Instantiate(prefab)
+                : new GameObject(name, typeof(RectTransform), typeof(Image));
+            go.name = name;
             go.transform.SetParent(parent, false);
             var rt = go.GetComponent<RectTransform>();
             rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
@@ -57,6 +61,12 @@ namespace ShadowGarden.Presentation
             rt.anchoredPosition = anchored;
             var image = go.GetComponent<Image>();
             image.color = color;
+            var skin = PresentationAssetLibrary.Catalog;
+            if (skin?.panel != null)
+            {
+                image.sprite = skin.panel;
+                image.type = Image.Type.Sliced;
+            }
             return image;
         }
 
@@ -92,7 +102,7 @@ namespace ShadowGarden.Presentation
             tmp.alignment = align;
             tmp.color = UiTheme.TextPrimary;
             tmp.raycastTarget = false;
-            tmp.enableWordWrapping = true;
+            tmp.textWrappingMode = TextWrappingModes.Normal;
             tmp.overflowMode = TextOverflowModes.Overflow;
             UiTypography.Apply(tmp, bold);
             return tmp;
@@ -118,10 +128,22 @@ namespace ShadowGarden.Presentation
                 var rt = existing.GetComponent<RectTransform>();
                 rt.anchoredPosition = anchored;
                 rt.sizeDelta = new Vector2(width, height);
+                var outline = existing.GetComponent<Outline>() ?? existing.gameObject.AddComponent<Outline>();
+                outline.effectColor = UiTheme.Mint;
+                outline.effectDistance = new Vector2(UiTheme.FocusOutline, UiTheme.FocusOutline);
+                outline.enabled = false;
+                if (existing.GetComponent<UiFocusOutline>() == null)
+                {
+                    existing.gameObject.AddComponent<UiFocusOutline>();
+                }
             }
             else
             {
-                var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button), typeof(Outline));
+                var prefab = Resources.Load<GameObject>("Presentation/Prefabs/FinalButton");
+                var go = prefab != null
+                    ? Object.Instantiate(prefab)
+                    : new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button), typeof(Outline));
+                go.name = name;
                 go.transform.SetParent(parent, false);
                 var rt = go.GetComponent<RectTransform>();
                 rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
@@ -133,12 +155,20 @@ namespace ShadowGarden.Presentation
                 outline.effectColor = UiTheme.Mint;
                 outline.effectDistance = new Vector2(UiTheme.FocusOutline, UiTheme.FocusOutline);
                 outline.enabled = false;
-                go.AddComponent<UiFocusOutline>();
+                if (go.GetComponent<UiFocusOutline>() == null)
+                {
+                    go.AddComponent<UiFocusOutline>();
+                }
             }
 
-            image.color = UiTheme.Navy;
+            var catalog = PresentationAssetLibrary.Catalog;
+            var secondary = IsSecondaryAction(name);
+            image.sprite = secondary ? catalog?.buttonSecondary : catalog?.buttonPrimary;
+            image.type = image.sprite != null ? Image.Type.Sliced : Image.Type.Simple;
+            image.color = image.sprite != null ? Color.white : UiTheme.Navy;
             var labelTmp = EnsureButtonLabel(button.transform, label);
             labelTmp.fontSize = UiTheme.ButtonFont;
+            labelTmp.color = secondary ? UiTheme.NavyDeep : UiTheme.Ivory;
             UiTypography.Apply(labelTmp, bold: true);
 
             button.transition = Selectable.Transition.ColorTint;
@@ -150,13 +180,17 @@ namespace ShadowGarden.Presentation
             colors.disabledColor = new Color(0.55f, 0.55f, 0.58f, 0.7f);
             button.colors = colors;
 
-            button.onClick.RemoveAllListeners();
             if (onClick != null)
             {
+                // Refreshing an existing production screen is allowed to restyle its
+                // controls without destroying callbacks wired by MainFlowScreens.
+                // Only replace listeners when this factory call owns a callback.
+                button.onClick.RemoveAllListeners();
                 button.onClick.AddListener(onClick);
             }
 
             button.gameObject.SetActive(true);
+            EnsureFocusFrame(button.transform, catalog?.buttonFocus);
             return button;
         }
 
@@ -171,7 +205,9 @@ namespace ShadowGarden.Presentation
             var image = button.GetComponent<Image>();
             if (image != null)
             {
-                image.color = interactable ? UiTheme.Navy : UiTheme.Disabled;
+                image.color = interactable
+                    ? (image.sprite != null ? Color.white : UiTheme.Navy)
+                    : UiTheme.Disabled;
             }
         }
 
@@ -211,45 +247,50 @@ namespace ShadowGarden.Presentation
             tmp.raycastTarget = false;
             return tmp;
         }
+
+        public static Image EnsureIcon(
+            Transform parent,
+            string name,
+            Sprite sprite,
+            Vector2 size,
+            Vector2 anchored = default)
+        {
+            var existing = parent.Find(name);
+            var image = existing != null
+                ? existing.GetComponent<Image>() ?? existing.gameObject.AddComponent<Image>()
+                : new GameObject(name, typeof(RectTransform), typeof(Image)).GetComponent<Image>();
+            if (existing == null) image.transform.SetParent(parent, false);
+            var rt = image.rectTransform;
+            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.sizeDelta = size;
+            rt.anchoredPosition = anchored;
+            image.sprite = sprite;
+            image.color = Color.white;
+            image.preserveAspect = true;
+            image.raycastTarget = false;
+            return image;
+        }
+
+        private static bool IsSecondaryAction(string name)
+        {
+            return name.Contains("Settings") || name.Contains("Replay") || name.Contains("NewGame") ||
+                   name.Contains("LevelSelect") || name.Contains("WorldMap") || name.Contains("Back") ||
+                   name.Contains("Credits") || name.Contains("Cancel");
+        }
+
+        private static void EnsureFocusFrame(Transform button, Sprite sprite)
+        {
+            if (sprite == null) return;
+            var image = EnsureIcon(button, "FocusFrame", sprite, Vector2.zero);
+            var rt = image.rectTransform;
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.offsetMin = new Vector2(-5f, -5f);
+            rt.offsetMax = new Vector2(5f, 5f);
+            image.type = Image.Type.Sliced;
+            image.gameObject.SetActive(false);
+            image.transform.SetAsFirstSibling();
+        }
     }
 
-    /// <summary>Shows mint Outline while EventSystem selection points at this button.</summary>
-    public sealed class UiFocusOutline : MonoBehaviour, ISelectHandler, IDeselectHandler
-    {
-        private Outline _outline;
-
-        private void Awake()
-        {
-            _outline = GetComponent<Outline>();
-        }
-
-        private void OnEnable()
-        {
-            Sync();
-        }
-
-        public void OnSelect(BaseEventData eventData) => Set(true);
-
-        public void OnDeselect(BaseEventData eventData) => Set(false);
-
-        private void Sync()
-        {
-            var selected = EventSystem.current != null &&
-                           EventSystem.current.currentSelectedGameObject == gameObject;
-            Set(selected);
-        }
-
-        private void Set(bool on)
-        {
-            if (_outline == null)
-            {
-                _outline = GetComponent<Outline>();
-            }
-
-            if (_outline != null)
-            {
-                _outline.enabled = on;
-            }
-        }
-    }
 }

@@ -1,0 +1,36 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6902f163ea9274aab9f98ed9f850c52e, type: 3}
+  m_Name: AudioSet
+  m_EditorClassIdentifier: ShadowGarden.Presentation::ShadowGarden.Presentation.AudioSetAsset
+  commonMotif: {fileID: 8300000, guid: 15d6eb3bce6c4459c8e79b6dbac6b412, type: 3}
+  orchardLayer: {fileID: 8300000, guid: 0ef0c423cd603498ea8dde5f64b09a36, type: 3}
+  canyonLayer: {fileID: 8300000, guid: 4d3e544e985c849ba9aa4bc51f0643ec, type: 3}
+  greenhouseLayer: {fileID: 8300000, guid: ed179931c3827414e9ba5e8598e61c8f, type: 3}
+  orchardAmbience: {fileID: 8300000, guid: 13235f6f50de84d809a14aca0434915b, type: 3}
+  canyonAmbience: {fileID: 8300000, guid: 158692a0fe038417da44e2622b080aed, type: 3}
+  greenhouseAmbience: {fileID: 8300000, guid: 3cd4b9773beed45b4bc2ce5c03a4180a, type: 3}
+  move: {fileID: 8300000, guid: 5b0cfa7d03ab94f8aa263e2857bc2aac, type: 3}
+  rotate: {fileID: 8300000, guid: 02b7ddcc4bc1c46969d3c3b5fb4f9176, type: 3}
+  shadowCell: {fileID: 8300000, guid: 7ec6448446bee4adfae605ff8288a4ff, type: 3}
+  warning30: {fileID: 8300000, guid: 60c4b71ff9cb84128bd27502817a4cc1, type: 3}
+  warning10: {fileID: 8300000, guid: d8658f9cae0784524805ee846bec2bb5, type: 3}
+  blocked: {fileID: 8300000, guid: a41acab2caa7c46dd91dc3379375833a, type: 3}
+  overlapDeath: {fileID: 8300000, guid: 8aeb578b35f5648449e785964a659dbe, type: 3}
+  cliffDeath: {fileID: 8300000, guid: bf794168cf1454deb8abf1cd6a0002c6, type: 3}
+  timeDeath: {fileID: 8300000, guid: 4757a8009148241228e9964a6149e8d1, type: 3}
+  doorOpen: {fileID: 8300000, guid: 233f6ffecc94d42718cb5af78e50b3f6, type: 3}
+  doorPass: {fileID: 8300000, guid: 9016a523e9964478ea26e45849f3c9d7, type: 3}
+  flowerBloom: {fileID: 8300000, guid: a03935ac8d3734a6a8aeccbf22ae42ae, type: 3}
+  complete: {fileID: 8300000, guid: 65d151c8566c64af5b9c972d3d5b34c7, type: 3}
+  uiMove: {fileID: 8300000, guid: a976ff73c5d6949c3be23c7f20e04eff, type: 3}
+  uiSubmit: {fileID: 8300000, guid: 6a500f860f0a54599be86d8dbfff666c, type: 3}

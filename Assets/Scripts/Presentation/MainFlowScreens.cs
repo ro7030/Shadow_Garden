@@ -275,18 +275,16 @@ namespace ShadowGarden.Presentation
                 _openingHoldActive = false;
                 if (_openingHoldFill != null)
                 {
-                    _openingHoldFill.fillAmount = 0f;
+                    UpdateOpeningHoldGauge(0f);
                 }
 
                 return;
             }
 
             var keyboard = UnityEngine.InputSystem.Keyboard.current;
-            var mouse = UnityEngine.InputSystem.Mouse.current;
             var holding =
                 _openingHoldActive ||
-                (keyboard != null && (keyboard.spaceKey.isPressed || keyboard.enterKey.isPressed)) ||
-                (mouse != null && mouse.leftButton.isPressed);
+                (keyboard != null && (keyboard.spaceKey.isPressed || keyboard.enterKey.isPressed));
 
             if (!holding)
             {
@@ -297,11 +295,8 @@ namespace ShadowGarden.Presentation
                 _openingHoldSeconds += Time.unscaledDeltaTime;
             }
 
-            if (_openingHoldFill != null)
-            {
-                _openingHoldFill.fillAmount = Mathf.Clamp01(
-                    _openingHoldSeconds / PresentationTiming.OpeningSkipHoldSeconds);
-            }
+            UpdateOpeningHoldGauge(Mathf.Clamp01(
+                _openingHoldSeconds / PresentationTiming.OpeningSkipHoldSeconds));
 
             if (_openingHoldSeconds >= PresentationTiming.OpeningSkipHoldSeconds)
             {
@@ -309,6 +304,19 @@ namespace ShadowGarden.Presentation
                 _openingHoldActive = false;
                 main.CompleteOpening();
             }
+        }
+
+        private void UpdateOpeningHoldGauge(float progress)
+        {
+            if (_openingHoldFill == null)
+            {
+                return;
+            }
+
+            var normalized = Mathf.Clamp01(progress);
+            _openingHoldFill.gameObject.SetActive(normalized > 0.001f);
+            var rect = _openingHoldFill.rectTransform;
+            rect.sizeDelta = new Vector2(Mathf.Max(1f, 320f * normalized), 10f);
         }
 
         private void OnNavigate(Vector2 value)
@@ -326,12 +334,14 @@ namespace ShadowGarden.Presentation
             }
 
             _navigateCooldown = 0.18f;
+            var movedFocus = false;
             var state = main.CurrentState;
             if (state == AppState.WorldMap && _worldMapVm != null)
             {
                 _worldMapVm.MoveFocusGrid(dx, -dy);
                 SyncWorldMapFocusVisual();
                 FocusWorldMapButton(_worldMapVm.FocusedStageId);
+                movedFocus = true;
             }
             else if (state == AppState.GameOver || state == AppState.Cleared)
             {
@@ -339,17 +349,20 @@ namespace ShadowGarden.Presentation
                 {
                     _modalVm.MoveSelection(-dy);
                     SelectModalIndex(_modalVm.SelectedIndex);
+                    movedFocus = true;
                 }
             }
             else if (state == AppState.Title)
             {
                 CycleTitleFocus(dy != 0 ? -dy : dx);
+                movedFocus = true;
             }
             else if (state == AppState.Opening)
             {
                 if (dy != 0 || dx != 0)
                 {
                     ToggleOpeningFocus();
+                    movedFocus = true;
                 }
             }
             else if (state == AppState.Ending)
@@ -357,8 +370,10 @@ namespace ShadowGarden.Presentation
                 if (dy != 0 || dx != 0)
                 {
                     ToggleEndingFocus();
+                    movedFocus = true;
                 }
             }
+            if (movedFocus) main.Gameplay?.PlayUiMove();
         }
 
         private void OnSubmit()
@@ -367,6 +382,8 @@ namespace ShadowGarden.Presentation
             {
                 return;
             }
+
+            main.Gameplay?.PlayUiSubmit();
 
             switch (main.CurrentState)
             {
@@ -448,7 +465,8 @@ namespace ShadowGarden.Presentation
             SetClick(_titleReplayOpening, () => main?.ReplayOpening());
             SetClick(_titleSettings, () => main?.OpenSettingsFromTitle());
             SetClick(_openingContinue, AdvanceOpeningOrComplete);
-            SetClick(_openingSkip, () => { _openingHoldActive = true; });
+            SetClick(_openingSkip, () => { });
+            ConfigureOpeningHoldEvents(_openingSkip);
             SetClick(_endingWorldMap, () => main?.FinishEndingToWorldMap());
             SetClick(_endingTitle, () => main?.FinishEnding());
         }
@@ -464,6 +482,7 @@ namespace ShadowGarden.Presentation
             _openingPage = 0;
             _openingHoldSeconds = 0f;
             _openingHoldActive = false;
+            UpdateOpeningHoldGauge(0f);
             ApplyOpeningPage();
             SelectButton(_openingContinue);
         }
@@ -535,7 +554,7 @@ namespace ShadowGarden.Presentation
             _titleSettings = EnsureButton(root.transform, "SettingsButton", "설정", new Vector2(0f, -190f));
             _titleProgressLabel = EnsureLabel(root.transform, "ProgressLabel", string.Empty, new Vector2(0f, -260f), 20f);
             // Remove legacy StartButton if present.
-            var legacy = root.transform.Find("StartButton");
+            var legacy = FindDescendant(root.transform, "StartButton");
             if (legacy != null)
             {
                 legacy.gameObject.SetActive(false);
@@ -569,17 +588,36 @@ namespace ShadowGarden.Presentation
                 gauge.transform.SetParent(root.transform, false);
                 var grt = gauge.GetComponent<RectTransform>();
                 grt.anchorMin = grt.anchorMax = new Vector2(0.5f, 0.5f);
-                grt.sizeDelta = new Vector2(56f, 56f);
+                grt.sizeDelta = new Vector2(320f, 10f);
                 grt.anchoredPosition = new Vector2(0f, -270f);
                 _openingHoldFill = gauge.GetComponent<Image>();
                 _openingHoldFill.color = UiTheme.Mint;
-                _openingHoldFill.type = Image.Type.Filled;
-                _openingHoldFill.fillMethod = Image.FillMethod.Radial360;
-                _openingHoldFill.fillOrigin = (int)Image.Origin360.Top;
-                _openingHoldFill.fillClockwise = true;
-                _openingHoldFill.fillAmount = 0f;
+                _openingHoldFill.type = Image.Type.Simple;
                 _openingHoldFill.raycastTarget = false;
+                _openingHoldFill.gameObject.SetActive(false);
             }
+        }
+
+        private void ConfigureOpeningHoldEvents(Button button)
+        {
+            if (button == null)
+            {
+                return;
+            }
+
+            var trigger = button.GetComponent<EventTrigger>() ?? button.gameObject.AddComponent<EventTrigger>();
+            trigger.triggers ??= new List<EventTrigger.Entry>();
+            trigger.triggers.Clear();
+            AddTrigger(trigger, EventTriggerType.PointerDown, () => _openingHoldActive = true);
+            AddTrigger(trigger, EventTriggerType.PointerUp, () => _openingHoldActive = false);
+            AddTrigger(trigger, EventTriggerType.PointerExit, () => _openingHoldActive = false);
+        }
+
+        private static void AddTrigger(EventTrigger trigger, EventTriggerType type, UnityAction action)
+        {
+            var entry = new EventTrigger.Entry { eventID = type };
+            entry.callback.AddListener(_ => action?.Invoke());
+            trigger.triggers.Add(entry);
         }
 
         private void EnsureWorldMap(GameObject root)
@@ -590,7 +628,17 @@ namespace ShadowGarden.Presentation
             }
 
             SetRootLabel(root, "월드 맵");
-            var legacy = root.transform.Find("Stage11Button");
+            var titleTransform = FindDescendant(root.transform, "TitleLabel") ??
+                                 FindDescendant(root.transform, "Label");
+            var title = titleTransform != null ? titleTransform.GetComponent<RectTransform>() : null;
+            if (title != null)
+            {
+                title.anchorMin = title.anchorMax = new Vector2(0.5f, 0.5f);
+                title.pivot = new Vector2(0.5f, 0.5f);
+                title.anchoredPosition = new Vector2(0f, 430f);
+                title.sizeDelta = new Vector2(460f, 64f);
+            }
+            var legacy = FindDescendant(root.transform, "Stage11Button");
             if (legacy != null)
             {
                 legacy.gameObject.SetActive(false);
@@ -738,9 +786,24 @@ namespace ShadowGarden.Presentation
             rt.anchoredPosition = pos;
             var image = go.GetComponent<Image>();
             var accent = WorldAccent(world.WorldNumber);
-            image.color = world.Unlocked
-                ? new Color(accent.r * 0.35f, accent.g * 0.35f, accent.b * 0.4f, 0.95f)
-                : new Color(0.08f, 0.09f, 0.12f, 0.9f);
+            image.sprite = PresentationAssetLibrary.Catalog?.worldCardFrame;
+            image.type = image.sprite != null ? Image.Type.Sliced : Image.Type.Simple;
+            image.color = world.Unlocked ? Color.white : new Color(0.35f, 0.37f, 0.42f, 0.92f);
+
+            var art = PresentationAssetLibrary.ForStage($"{world.WorldNumber}-1");
+            var preview = new GameObject("WorldPreview", typeof(RectTransform), typeof(Image));
+            preview.transform.SetParent(go.transform, false);
+            var previewRt = preview.GetComponent<RectTransform>();
+            previewRt.anchorMin = new Vector2(0f, 1f);
+            previewRt.anchorMax = new Vector2(1f, 1f);
+            previewRt.pivot = new Vector2(0.5f, 1f);
+            previewRt.sizeDelta = new Vector2(-24f, 112f);
+            previewRt.anchoredPosition = new Vector2(0f, -20f);
+            var previewImage = preview.GetComponent<Image>();
+            previewImage.sprite = art?.background;
+            previewImage.color = world.Unlocked ? Color.white : new Color(0.35f, 0.35f, 0.38f, 0.85f);
+            previewImage.preserveAspect = false;
+            previewImage.raycastTarget = false;
 
             var band = new GameObject("AccentBand", typeof(RectTransform), typeof(Image));
             band.transform.SetParent(go.transform, false);
@@ -756,7 +819,7 @@ namespace ShadowGarden.Presentation
                 go.transform,
                 "WorldTitle",
                 world.Unlocked ? world.WorldTitle : $"{world.WorldTitle} (잠김)",
-                new Vector2(0f, 150f),
+                new Vector2(0f, 145f),
                 24f);
             title.fontStyle = FontStyles.Bold;
 
@@ -766,7 +829,7 @@ namespace ShadowGarden.Presentation
                     go.transform,
                     "LockHint",
                     "이전 월드의 밤꽃을 피워 주세요",
-                    new Vector2(0f, 110f),
+                    new Vector2(0f, 102f),
                     16f);
                 lockHint.color = new Color(0.75f, 0.75f, 0.8f, 1f);
             }
@@ -783,23 +846,30 @@ namespace ShadowGarden.Presentation
 
         private static Button CreateStageNodeButton(Transform parent, StageNodeViewModel node, Vector2 pos)
         {
-            var icon = string.IsNullOrEmpty(node.CompletionIcon) ? string.Empty : node.CompletionIcon + " ";
-            var label = $"{icon}{node.StageId}  {node.TimeLabel}";
+            var label = $"{node.StageId}   {node.TimeLabel}";
             var button = EnsureButton(parent, $"Stage_{node.StageId}", label, pos);
             button.interactable = node.Unlocked;
             var image = button.GetComponent<Image>();
             if (image != null)
             {
-                image.color = node.Unlocked
-                    ? new Color(0.18f, 0.28f, 0.4f, 0.95f)
-                    : new Color(0.1f, 0.1f, 0.12f, 0.7f);
+                image.color = node.Unlocked ? Color.white : new Color(0.38f, 0.4f, 0.44f, 0.82f);
             }
+
+            var catalog = PresentationAssetLibrary.Catalog;
+            var completed = !string.IsNullOrEmpty(node.CompletionIcon);
+            var sprite = !node.Unlocked ? catalog?.iconLock : completed
+                ? (node.StageId.EndsWith("-4") ? catalog?.iconFlower : catalog?.iconDoor)
+                : catalog?.iconDoor;
+            var status = UiFactory.EnsureIcon(button.transform, "StatusIcon", sprite,
+                new Vector2(24f, 24f), new Vector2(-128f, 0f));
+            status.color = !node.Unlocked ? new Color(1f, 1f, 1f, 0.45f) : completed
+                ? UiTheme.Mint : new Color(1f, 1f, 1f, 0.3f);
 
             var tmp = button.GetComponentInChildren<TextMeshProUGUI>(true);
             if (tmp != null)
             {
                 tmp.fontSize = 20;
-                tmp.color = node.Unlocked ? Color.white : new Color(0.55f, 0.55f, 0.58f, 1f);
+                tmp.color = node.Unlocked ? UiTheme.Ivory : new Color(0.55f, 0.55f, 0.58f, 1f);
             }
 
             return button;
@@ -827,15 +897,19 @@ namespace ShadowGarden.Presentation
 
                 if (!node.Unlocked)
                 {
-                    image.color = new Color(0.1f, 0.1f, 0.12f, 0.7f);
-                }
-                else if (node.IsFocused)
-                {
-                    image.color = new Color(0.32f, 0.48f, 0.72f, 1f);
+                    image.color = new Color(0.38f, 0.4f, 0.44f, 0.82f);
                 }
                 else
                 {
-                    image.color = new Color(0.18f, 0.28f, 0.4f, 0.95f);
+                    image.color = Color.white;
+                }
+
+                var label = button.GetComponentInChildren<TextMeshProUGUI>(true);
+                if (label != null)
+                {
+                    label.color = node.Unlocked
+                        ? UiTheme.Ivory
+                        : new Color(0.55f, 0.55f, 0.58f, 1f);
                 }
             }
         }
@@ -858,11 +932,11 @@ namespace ShadowGarden.Presentation
                 return;
             }
 
-            foreach (Transform child in root.transform)
+            foreach (var button in root.GetComponentsInChildren<Button>(true))
             {
-                if (child.name.EndsWith("Button"))
+                if (button != null && button.name.EndsWith("Button"))
                 {
-                    child.gameObject.SetActive(false);
+                    button.gameObject.SetActive(false);
                 }
             }
 
@@ -904,14 +978,7 @@ namespace ShadowGarden.Presentation
             for (var i = 0; i < _modalButtons.Count; i++)
             {
                 var image = _modalButtons[i].GetComponent<Image>();
-                if (image == null)
-                {
-                    continue;
-                }
-
-                image.color = i == clamped
-                    ? new Color(0.32f, 0.48f, 0.72f, 1f)
-                    : new Color(0.16f, 0.22f, 0.34f, 0.92f);
+                if (image != null) image.color = Color.white;
             }
         }
 
@@ -1019,17 +1086,14 @@ namespace ShadowGarden.Presentation
                 Object.Destroy(legacy);
             }
 
-            var tmp = root.GetComponentInChildren<TextMeshProUGUI>(true);
+            var titleTransform = FindDescendant(root.transform, "TitleLabel") ??
+                                 FindDescendant(root.transform, "Label");
+            var tmp = titleTransform != null
+                ? titleTransform.GetComponent<TextMeshProUGUI>()
+                : null;
             if (tmp == null)
             {
                 tmp = CreateTitleLabel(root.transform, text);
-            }
-
-            // Prefer the root title label, not nested button labels.
-            var title = root.transform.Find("TitleLabel");
-            if (title != null)
-            {
-                tmp = title.GetComponent<TextMeshProUGUI>();
             }
 
             if (tmp == null)
@@ -1075,7 +1139,7 @@ namespace ShadowGarden.Presentation
             Vector2 anchoredPos,
             float fontSize)
         {
-            var existing = parent.Find(name);
+            var existing = FindDescendant(parent, name);
             TextMeshProUGUI tmp;
             if (existing != null)
             {
@@ -1108,61 +1172,42 @@ namespace ShadowGarden.Presentation
 
         private static Button EnsureButton(Transform parent, string name, string label, Vector2 anchoredPos)
         {
-            var existing = parent.Find(name);
-            if (existing != null)
-            {
-                var existingButton = existing.GetComponent<Button>();
-                var existingTmp = existing.GetComponentInChildren<TextMeshProUGUI>(true);
-                if (existingTmp != null)
-                {
-                    existingTmp.text = label;
-                    UiTypography.Apply(existingTmp, bold: true);
-                }
-
-                var existingRt = existing.GetComponent<RectTransform>();
-                if (existingRt != null)
-                {
-                    existingRt.anchoredPosition = anchoredPos;
-                }
-
-                existing.gameObject.SetActive(true);
-                return existingButton;
-            }
-
-            var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
-            go.transform.SetParent(parent, false);
-            var rt = go.GetComponent<RectTransform>();
-            rt.anchorMin = new Vector2(0.5f, 0.5f);
-            rt.anchorMax = new Vector2(0.5f, 0.5f);
-            rt.sizeDelta = new Vector2(Mathf.Max(280f, UiTheme.ButtonWidth * 0.9f), Mathf.Max(56f, UiTheme.ButtonMinHeight));
-            rt.anchoredPosition = anchoredPos;
-            var image = go.GetComponent<Image>();
-            image.color = UiTheme.Navy;
-
-            var textGo = new GameObject("Label", typeof(RectTransform));
-            textGo.transform.SetParent(go.transform, false);
-            var textRt = textGo.GetComponent<RectTransform>();
-            textRt.anchorMin = Vector2.zero;
-            textRt.anchorMax = Vector2.one;
-            textRt.offsetMin = Vector2.zero;
-            textRt.offsetMax = Vector2.zero;
-            var tmp = textGo.AddComponent<TextMeshProUGUI>();
-            tmp.text = label;
-            tmp.alignment = TextAlignmentOptions.Center;
-            tmp.fontSize = UiTheme.ButtonFont;
-            tmp.color = UiTheme.Ivory;
-            UiTypography.Apply(tmp, bold: true);
-
-            var outline = go.AddComponent<Outline>();
-            outline.effectColor = UiTheme.Mint;
-            outline.effectDistance = new Vector2(UiTheme.FocusOutline, UiTheme.FocusOutline);
-            outline.enabled = false;
-            go.AddComponent<UiFocusOutline>();
-
-            return go.GetComponent<Button>();
+            var existing = FindDescendant(parent, name);
+            return UiFactory.CreateButton(
+                existing != null ? existing.parent : parent,
+                name,
+                label,
+                anchoredPos,
+                null,
+                width: Mathf.Max(280f, UiTheme.ButtonWidth * 0.9f),
+                height: Mathf.Max(56f, UiTheme.ButtonMinHeight));
         }
 
-        private static void SetClick(Button button, UnityAction action)
+        private static Transform FindDescendant(Transform root, string name)
+        {
+            if (root == null || string.IsNullOrEmpty(name))
+            {
+                return null;
+            }
+
+            if (root.name == name)
+            {
+                return root;
+            }
+
+            for (var i = 0; i < root.childCount; i++)
+            {
+                var found = FindDescendant(root.GetChild(i), name);
+                if (found != null)
+                {
+                    return found;
+                }
+            }
+
+            return null;
+        }
+
+        private void SetClick(Button button, UnityAction action)
         {
             if (button == null)
             {
@@ -1170,7 +1215,11 @@ namespace ShadowGarden.Presentation
             }
 
             button.onClick.RemoveAllListeners();
-            button.onClick.AddListener(action);
+            button.onClick.AddListener(() =>
+            {
+                main?.Gameplay?.PlayUiSubmit();
+                action?.Invoke();
+            });
         }
     }
 }

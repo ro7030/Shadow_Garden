@@ -16,6 +16,8 @@ namespace ShadowGarden.Presentation
         [SerializeField] private PlayerPresenter playerPresenter;
         [SerializeField] private MainPlayHud playHud;
         [SerializeField] private OnboardingHintsPresenter onboarding;
+        [SerializeField] private PresentationAudioController presentationAudio;
+        [SerializeField] private GameplayFxPresenter gameplayFx;
         [SerializeField] private Transform hudParent;
 
         private MainCompositionRoot _main;
@@ -37,6 +39,8 @@ namespace ShadowGarden.Presentation
         public int RestartCount => _restartCount;
         public OnboardingHintsPresenter Onboarding => onboarding;
         public MainPlayHud PlayHud => playHud;
+        public void PlayUiMove() => presentationAudio?.PlayUiMove();
+        public void PlayUiSubmit() => presentationAudio?.PlayUiSubmit();
 
         private bool _externalPause;
         private bool _reduceMotion;
@@ -45,8 +49,11 @@ namespace ShadowGarden.Presentation
         {
             _reduceMotion = enabled;
             boardPresenter?.SetReduceMotion(enabled);
+            gameplayFx?.Bind(enabled);
             playHud?.ApplyPreferences();
         }
+
+        public void ApplyAudioPreferences() => presentationAudio?.ApplyPreferences();
 
         public void Bind(MainCompositionRoot main)
         {
@@ -54,6 +61,7 @@ namespace ShadowGarden.Presentation
             _main = main;
             EnsureComponents();
             playHud?.Bind(main);
+            presentationAudio?.Bind(main);
             SubscribeInput();
         }
 
@@ -103,13 +111,20 @@ namespace ShadowGarden.Presentation
 
             boardPresenter.Build(definition);
             playerPresenter.Snap(definition.PlayerStart);
+            presentationAudio.BeginStage(definition.StageId);
+            gameplayFx.Bind(_reduceMotion);
             onboarding.ResetProgress();
             playHud.EnsureBuilt(hudParent != null ? hudParent : transform);
             playHud.Bind(_main);
             playHud.SetVisible(true);
             playHud.Render(definition, _session.State);
             ApplyReduceMotion(_main?.Save?.Preferences != null && _main.Save.Preferences.reduceMotion);
-            BoardCameraFitter.Apply(Camera.main, definition.BoardSize);
+            var boardPadding = definition.BoardSize.Width >= 16 || definition.BoardSize.Height >= 8
+                ? 2f
+                : definition.BoardSize.Width > 12 || definition.BoardSize.Height > 6
+                    ? 1.55f
+                    : BoardCameraFitter.DefaultPaddingCells;
+            BoardCameraFitter.Apply(Camera.main, definition.BoardSize, boardPadding);
             ApplyCameraLook();
 
             _main?.Input?.EnableGameplay(true);
@@ -226,19 +241,28 @@ namespace ShadowGarden.Presentation
             var result = _session.Move(direction);
             if (!result.Move.HasValue || result.Move.Value.Outcome == MoveOutcome.Blocked)
             {
+                presentationAudio?.Play(presentationAudio.Clips?.blocked, 0.7f);
                 return;
             }
 
             onboarding.NotifyMoved();
+            presentationAudio?.Play(presentationAudio.Clips?.move, 0.72f);
             _main.Input?.LockForSeconds(PresentationTiming.MoveSeconds);
             var to = result.Move.Value.TargetPosition;
             if (result.Move.Value.Outcome == MoveOutcome.Moved ||
                 result.Move.Value.Outcome == MoveOutcome.ExitReached ||
-                result.Move.Value.Outcome == MoveOutcome.NightFlowerReached ||
-                result.Move.Value.Outcome == MoveOutcome.CliffDeath ||
-                result.Move.Value.Outcome == MoveOutcome.OverlapDeath)
+                result.Move.Value.Outcome == MoveOutcome.NightFlowerReached)
             {
                 playerPresenter.AnimateMove(from, to, PresentationTiming.MoveSeconds);
+            }
+            else if (result.Move.Value.Outcome == MoveOutcome.CliffDeath ||
+                     result.Move.Value.Outcome == MoveOutcome.OverlapDeath)
+            {
+                var cause = result.Move.Value.DeathCause ??
+                            (result.Move.Value.Outcome == MoveOutcome.OverlapDeath
+                                ? GameOverCause.OverlappingShadows
+                                : GameOverCause.CliffFall);
+                StartCoroutine(GameOverSequence(cause, from, to, direction, movementDeath: true));
             }
         }
 
@@ -254,6 +278,7 @@ namespace ShadowGarden.Presentation
                 return;
             }
 
+            var previousCounts = _session.Shadows?.ShadowCountByCell;
             var result = _session.Rotate(turns);
             if (result.Events.Length == 0)
             {
@@ -261,8 +286,13 @@ namespace ShadowGarden.Presentation
             }
 
             onboarding.NotifyRotated();
+            presentationAudio?.Play(presentationAudio.Clips?.rotate, 0.82f);
+            gameplayFx?.PlayRotate(_session.State.PlayerPosition, MockupPalette.ChannelColor(lamp.Channel),
+                PresentationTiming.RotateSeconds);
             _main.Input?.LockForSeconds(PresentationTiming.RotateSeconds);
             boardPresenter.PulseChannelPillars(_definition, lamp.Channel, PresentationTiming.RotateSeconds);
+            boardPresenter.PlayEnvironmentReaction(PresentationTiming.RotateSeconds + 0.30f);
+            presentationAudio?.PlayShadowCellChimes(CountChangedShadowCells(previousCounts));
         }
 
         private void OnReset()
@@ -320,13 +350,33 @@ namespace ShadowGarden.Presentation
                 switch (stageEvent.Type)
                 {
                     case StageEventType.GameOverStarted:
-                        StartCoroutine(GameOverSequence(stageEvent.GameOverCause ?? GameOverCause.CliffFall));
+                        // Movement deaths are dispatched by OnMove after StageSession.Move returns.
+                        // Starting them from this synchronous callback races with the normal move
+                        // presentation and used to leave the host permanently sequencing.
+                        if (result.Move.HasValue)
+                        {
+                            StartCoroutine(DeferredMovementGameOver(
+                                stageEvent.GameOverCause ?? GameOverCause.CliffFall,
+                                result.Move.Value.TargetPosition));
+                        }
+                        else
+                        {
+                            var position = result.NextState.PlayerPosition;
+                            StartCoroutine(GameOverSequence(
+                                stageEvent.GameOverCause ?? GameOverCause.TimeExpired,
+                                position,
+                                position,
+                                CardinalDirection.South,
+                                movementDeath: false));
+                        }
                         break;
                     case StageEventType.TimerWarning30:
                         playHud?.ShowTransientWarning("남은 시간 30초", UiTheme.Brass);
+                        presentationAudio?.Play(presentationAudio.Clips?.warning30);
                         break;
                     case StageEventType.TimerWarning10:
                         playHud?.ShowTransientWarning("남은 시간 10초!", UiTheme.Coral);
+                        presentationAudio?.Play(presentationAudio.Clips?.warning10);
                         break;
                     case StageEventType.ClearStarted:
                         _clearElapsedMs = _definition.TimeLimitSeconds * 1000L -
@@ -340,6 +390,23 @@ namespace ShadowGarden.Presentation
                         break;
                 }
             }
+        }
+
+        private IEnumerator DeferredMovementGameOver(GameOverCause cause, GridPosition target)
+        {
+            // Let the real Gameplay input path resume first. OnMove starts the authoritative
+            // sequence in the same frame with its exact origin and direction. Direct session
+            // calls used by tests/tools have no OnMove continuation, so they take this fallback.
+            yield return null;
+            if (_sequencing || _main == null || _main.CurrentState != AppState.Playing) yield break;
+
+            var from = _lastPlayerPos;
+            var dx = target.X - from.X;
+            var dy = target.Y - from.Y;
+            var direction = Mathf.Abs(dx) >= Mathf.Abs(dy)
+                ? (dx >= 0 ? CardinalDirection.East : CardinalDirection.West)
+                : (dy >= 0 ? CardinalDirection.South : CardinalDirection.North);
+            StartCoroutine(GameOverSequence(cause, from, target, direction, movementDeath: true));
         }
 
         private IEnumerator ClearSequence()
@@ -357,10 +424,16 @@ namespace ShadowGarden.Presentation
                 var bloom = _reduceMotion
                     ? PresentationTiming.NightFlowerBloomSeconds * 0.35f
                     : PresentationTiming.NightFlowerBloomSeconds;
-                yield return new WaitForSecondsRealtime(bloom);
+                presentationAudio?.Play(presentationAudio.Clips?.flowerBloom);
+                gameplayFx?.PlayFlowerBloom(_definition.GoalPosition, bloom);
+                var flower = boardPresenter.PlayFlowerBloom(_definition, bloom);
+                if (flower != null) yield return flower;
+                else yield return new WaitForSecondsRealtime(bloom);
             }
             else
             {
+                presentationAudio?.Play(presentationAudio.Clips?.doorOpen);
+                gameplayFx?.PlayDoorGlow(_definition.GoalPosition, PresentationTiming.DoorOpenSeconds);
                 var door = boardPresenter.PlayDoorOpen(_definition, PresentationTiming.DoorOpenSeconds);
                 if (door != null)
                 {
@@ -374,6 +447,7 @@ namespace ShadowGarden.Presentation
                 var pass = playerPresenter.AnimatePassThroughDoor(
                     _definition.GoalPosition,
                     PresentationTiming.GoalPassSeconds);
+                presentationAudio?.Play(presentationAudio.Clips?.doorPass);
                 if (pass != null)
                 {
                     yield return pass;
@@ -390,11 +464,31 @@ namespace ShadowGarden.Presentation
                     _reduceMotion ? 0.35f : PresentationTiming.WorldUnlockBeatSeconds);
             }
 
+            gameplayFx?.PlayComplete(_definition.GoalPosition, 0.7f);
             _main?.NotifyCleared(_stageId, _clearElapsedMs);
+            presentationAudio?.Play(presentationAudio.Clips?.complete);
             _sequencing = false;
         }
 
-        private IEnumerator GameOverSequence(GameOverCause cause)
+        private int CountChangedShadowCells(System.Collections.Generic.IReadOnlyList<int> previousCounts)
+        {
+            var current = _session?.Shadows?.ShadowCountByCell;
+            if (previousCounts == null || current == null) return 1;
+            var changed = 0;
+            var count = Mathf.Min(previousCounts.Count, current.Count);
+            for (var index = 0; index < count; index++)
+            {
+                if (previousCounts[index] != current[index]) changed++;
+            }
+            return Mathf.Clamp(changed, 1, 4);
+        }
+
+        private IEnumerator GameOverSequence(
+            GameOverCause cause,
+            GridPosition from,
+            GridPosition target,
+            CardinalDirection direction,
+            bool movementDeath)
         {
             if (_sequencing)
             {
@@ -403,31 +497,49 @@ namespace ShadowGarden.Presentation
 
             _sequencing = true;
             _main?.Input?.EnableGameplay(false);
-            var pos = _session.State.PlayerPosition;
-            Coroutine motion = null;
+            var effectPosition = movementDeath ? target : _session.State.PlayerPosition;
+            var sequenceSeconds = cause switch
+            {
+                GameOverCause.OverlappingShadows => PresentationTiming.MoveSeconds + PresentationTiming.OverlapSinkSeconds,
+                GameOverCause.CliffFall => PresentationTiming.MoveSeconds + PresentationTiming.CliffFallSeconds,
+                GameOverCause.TimeExpired => PresentationTiming.TimeVacuumSeconds,
+                _ => PresentationTiming.CliffFallSeconds
+            };
+            gameplayFx?.PlayDeath(cause, effectPosition, sequenceSeconds);
             switch (cause)
             {
                 case GameOverCause.OverlappingShadows:
-                    motion = playerPresenter.AnimateOverlapSink(pos, PresentationTiming.OverlapSinkSeconds);
+                    presentationAudio?.Play(presentationAudio.Clips?.overlapDeath);
+                    playerPresenter.AnimateOverlapSink(
+                        from,
+                        target,
+                        direction,
+                        PresentationTiming.MoveSeconds,
+                        PresentationTiming.OverlapSinkSeconds);
                     break;
                 case GameOverCause.CliffFall:
-                    motion = playerPresenter.AnimateCliffFall(pos, PresentationTiming.CliffFallSeconds);
+                    presentationAudio?.Play(presentationAudio.Clips?.cliffDeath);
+                    playerPresenter.AnimateCliffFall(from, direction, PresentationTiming.CliffFallSeconds);
                     break;
                 case GameOverCause.TimeExpired:
-                    motion = playerPresenter.AnimateTimeVacuum(pos, PresentationTiming.TimeVacuumSeconds);
+                    presentationAudio?.Play(presentationAudio.Clips?.timeDeath);
+                    playerPresenter.AnimateTimeVacuum(effectPosition, PresentationTiming.TimeVacuumSeconds);
                     break;
             }
 
-            if (motion != null)
+            // The host owns completion. A missing asset or a presentation coroutine being
+            // interrupted must never prevent the state machine from reaching GameOver.
+            var elapsed = 0f;
+            while (elapsed < sequenceSeconds && _main != null && _main.CurrentState == AppState.Playing)
             {
-                yield return motion;
-            }
-            else
-            {
-                yield return new WaitForSecondsRealtime(0.35f);
+                elapsed += Time.unscaledDeltaTime;
+                yield return null;
             }
 
-            _main?.NotifyGameOver(cause);
+            if (_main != null && _main.CurrentState == AppState.Playing)
+            {
+                _main.NotifyGameOver(cause);
+            }
             _sequencing = false;
         }
 
@@ -501,6 +613,17 @@ namespace ShadowGarden.Presentation
             {
                 onboarding = GetComponent<OnboardingHintsPresenter>() ??
                              gameObject.AddComponent<OnboardingHintsPresenter>();
+            }
+
+            if (presentationAudio == null)
+            {
+                presentationAudio = GetComponent<PresentationAudioController>() ??
+                                    gameObject.AddComponent<PresentationAudioController>();
+            }
+
+            if (gameplayFx == null)
+            {
+                gameplayFx = GetComponent<GameplayFxPresenter>() ?? gameObject.AddComponent<GameplayFxPresenter>();
             }
         }
 

@@ -9,7 +9,7 @@ namespace ShadowGarden.Presentation
 {
     /// <summary>
     /// Game typography contract (UI/UX §11 / §40): Noto Sans KR Regular/Bold TMP SDF, SIL OFL 1.1.
-    /// Symbol glyphs (⌂❀★…) are served by LiberationSans / ornament fallback atlases.
+    /// Only navigation symbols remain text glyphs. Goals, channels and status are dedicated sprites.
     /// </summary>
     public static class UiTypography
     {
@@ -27,7 +27,7 @@ namespace ShadowGarden.Presentation
         private const string OrnamentResource = "Fonts/ShadowGardenOrnaments SDF";
 
         /// <summary>Door / flower / channel ornaments used by board + world map.</summary>
-        public const string SymbolCorpus = "⌂❀★●▲◆↑↓←→×·";
+        public const string SymbolCorpus = "↑↓←→×·";
 
         private static TMP_FontAsset _regular;
         private static TMP_FontAsset _bold;

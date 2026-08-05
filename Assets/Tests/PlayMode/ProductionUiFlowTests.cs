@@ -1,4 +1,6 @@
 using System.Collections;
+using System.Linq;
+using System.Reflection;
 using NUnit.Framework;
 using ShadowGarden.Presentation;
 using ShadowGarden.Runtime;
@@ -43,6 +45,27 @@ namespace ShadowGarden.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator Refreshing_Title_Preserves_Continue_Button_Callback()
+        {
+            yield return LoadMain();
+            var root = Object.FindFirstObjectByType<MainCompositionRoot>();
+            var screens = Object.FindFirstObjectByType<MainFlowScreens>();
+            Assert.IsNotNull(root);
+            Assert.IsNotNull(screens);
+
+            root.Save.Preferences.openingSeen = true;
+            screens.RefreshTitleBranch();
+            yield return null;
+
+            var continueButton = GameObject.Find("ContinueButton")?.GetComponent<Button>();
+            Assert.IsNotNull(continueButton);
+            continueButton.onClick.Invoke();
+            yield return null;
+
+            Assert.AreEqual(AppState.WorldMap, root.CurrentState);
+        }
+
+        [UnityTest]
         public IEnumerator Pause_Opens_From_Screen_Button_Without_Esc()
         {
             yield return LoadMain();
@@ -80,6 +103,211 @@ namespace ShadowGarden.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator Gameplay_Input_Path_CliffDeath_Reaches_GameOver_Modal()
+        {
+            yield return LoadMain();
+            var root = Object.FindFirstObjectByType<MainCompositionRoot>();
+            Assert.IsNotNull(root);
+            root.Save.Preferences.openingSeen = true;
+            root.ContinueFromTitle();
+            yield return null;
+            root.StartStage("1-1");
+            yield return null;
+            yield return null;
+
+            var moveHandler = typeof(MainGameplayHost).GetMethod(
+                "OnMove",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.IsNotNull(moveHandler);
+            moveHandler.Invoke(root.Gameplay, new object[] { ShadowGarden.Core.CardinalDirection.North });
+
+            var guard = 0f;
+            while (root.CurrentState != AppState.GameOver && guard < 2f)
+            {
+                guard += Time.unscaledDeltaTime;
+                yield return null;
+            }
+
+            Assert.AreEqual(AppState.GameOver, root.CurrentState);
+            Assert.IsFalse(root.Gameplay.IsSequencing);
+            var retry = GameObject.Find("RetryButton");
+            var worldMap = GameObject.Find("WorldMapButton");
+            Assert.IsNotNull(retry);
+            Assert.IsNotNull(worldMap);
+            Assert.IsTrue(retry.activeInHierarchy);
+            Assert.IsTrue(worldMap.activeInHierarchy);
+            Assert.AreEqual("GameOverNotePanel", retry.transform.parent.parent.name);
+        }
+
+        [UnityTest]
+        public IEnumerator Gameplay_Input_Path_OverlapDeath_Reaches_GameOver_Modal()
+        {
+            yield return LoadMain();
+            var root = Object.FindFirstObjectByType<MainCompositionRoot>();
+            root.Save.Preferences.openingSeen = true;
+            root.ContinueFromTitle();
+            yield return null;
+            root.StartStage("1-1");
+            yield return null;
+
+            var stage = new ShadowGarden.Core.StageDefinition(
+                "overlap-test",
+                new ShadowGarden.Core.GridSize(4, 4),
+                new ShadowGarden.Core.GridPosition(1, 2),
+                new[]
+                {
+                    new ShadowGarden.Core.GridPosition(1, 2),
+                    new ShadowGarden.Core.GridPosition(0, 3),
+                    new ShadowGarden.Core.GridPosition(3, 3)
+                },
+                new[]
+                {
+                    new ShadowGarden.Core.LampDefinition(
+                        new ShadowGarden.Core.GridPosition(0, 3),
+                        ShadowGarden.Core.ChannelId.Circle,
+                        ShadowGarden.Core.CardinalDirection.East),
+                    new ShadowGarden.Core.LampDefinition(
+                        new ShadowGarden.Core.GridPosition(3, 3),
+                        ShadowGarden.Core.ChannelId.Triangle,
+                        ShadowGarden.Core.CardinalDirection.South)
+                },
+                new[]
+                {
+                    new ShadowGarden.Core.PillarDefinition(
+                        new ShadowGarden.Core.GridPosition(0, 1),
+                        ShadowGarden.Core.ChannelId.Circle,
+                        ShadowGarden.Core.PillarHeight.Low),
+                    new ShadowGarden.Core.PillarDefinition(
+                        new ShadowGarden.Core.GridPosition(1, 0),
+                        ShadowGarden.Core.ChannelId.Triangle,
+                        ShadowGarden.Core.PillarHeight.Low)
+                },
+                ShadowGarden.Core.ClearGoalType.ExitDoor,
+                new ShadowGarden.Core.GridPosition(3, 0),
+                120);
+            root.Gameplay.BeginDefinition(stage);
+            yield return null;
+
+            var moveHandler = typeof(MainGameplayHost).GetMethod(
+                "OnMove",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            moveHandler.Invoke(root.Gameplay, new object[] { ShadowGarden.Core.CardinalDirection.North });
+
+            var guard = 0f;
+            while (root.CurrentState != AppState.GameOver && guard < 2f)
+            {
+                guard += Time.unscaledDeltaTime;
+                yield return null;
+            }
+
+            Assert.AreEqual(AppState.GameOver, root.CurrentState);
+            Assert.IsFalse(root.Gameplay.IsSequencing);
+            var reason = GameObject.Find("ReasonLabel")?.GetComponent<TextMeshProUGUI>();
+            Assert.IsNotNull(reason);
+            StringAssert.Contains("겹친 그림자", reason.text);
+        }
+
+        [UnityTest]
+        public IEnumerator Gameplay_TimeExpired_Reaches_GameOver_Modal()
+        {
+            yield return LoadMain();
+            var root = Object.FindFirstObjectByType<MainCompositionRoot>();
+            root.Save.Preferences.openingSeen = true;
+            root.ContinueFromTitle();
+            yield return null;
+            root.StartStage("1-1");
+            yield return null;
+            yield return null;
+
+            root.Gameplay.Session.Tick(121000);
+            var guard = 0f;
+            while (root.CurrentState != AppState.GameOver && guard < 1.5f)
+            {
+                guard += Time.unscaledDeltaTime;
+                yield return null;
+            }
+
+            Assert.AreEqual(AppState.GameOver, root.CurrentState);
+            Assert.IsFalse(root.Gameplay.IsSequencing);
+            var reason = GameObject.Find("ReasonLabel")?.GetComponent<TextMeshProUGUI>();
+            Assert.IsNotNull(reason);
+            StringAssert.Contains("시간 안에", reason.text);
+        }
+
+        [UnityTest]
+        public IEnumerator Opening_Content_Remains_Inside_Note_Panel()
+        {
+            yield return LoadMain();
+            var root = Object.FindFirstObjectByType<MainCompositionRoot>();
+            root.Save.Preferences.openingSeen = false;
+            Assert.IsTrue(root.RequestState(AppState.Opening).Accepted);
+            yield return null;
+            yield return null;
+
+            var panel = GameObject.Find("OpeningNotePanel")?.GetComponent<RectTransform>();
+            Assert.IsNotNull(panel);
+            AssertInside(panel, GameObject.Find("OpeningPageLabel")?.GetComponent<RectTransform>());
+            AssertInside(panel, GameObject.Find("OpeningBody")?.GetComponent<RectTransform>());
+            AssertInside(panel, GameObject.Find("ContinueButton")?.GetComponent<RectTransform>());
+            AssertInside(panel, GameObject.Find("SkipButton")?.GetComponent<RectTransform>());
+        }
+
+        [UnityTest]
+        public IEnumerator Ending_To_Title_Reapplies_Title_Panel_Layout()
+        {
+            yield return LoadMain();
+            var root = Object.FindFirstObjectByType<MainCompositionRoot>();
+            Assert.IsTrue(root.RequestState(AppState.WorldMap).Accepted);
+            Assert.IsTrue(root.RequestState(AppState.Playing).Accepted);
+            Assert.IsTrue(root.RequestState(AppState.Cleared).Accepted);
+            Assert.IsTrue(root.RequestState(AppState.Ending).Accepted);
+            Assert.IsTrue(root.RequestState(AppState.Title).Accepted);
+            yield return null;
+            yield return null;
+
+            var panel = GameObject.Find("TitleNotePanel")?.GetComponent<RectTransform>();
+            Assert.IsNotNull(panel);
+            AssertInside(panel, GameObject.Find("ConceptLabel")?.GetComponent<RectTransform>());
+            AssertInside(panel, GameObject.Find("ContinueButton")?.GetComponent<RectTransform>());
+            AssertInside(panel, GameObject.Find("ReplayOpeningButton")?.GetComponent<RectTransform>());
+            AssertInside(panel, GameObject.Find("SettingsButton")?.GetComponent<RectTransform>());
+        }
+
+        [UnityTest]
+        public IEnumerator Repeated_Play_GameOver_WorldMap_Cycle_Does_Not_Duplicate_Ui()
+        {
+            yield return LoadMain();
+            var root = Object.FindFirstObjectByType<MainCompositionRoot>();
+            root.Save.Preferences.openingSeen = true;
+            root.ContinueFromTitle();
+            yield return null;
+
+            for (var iteration = 0; iteration < 10; iteration++)
+            {
+                root.StartStage("1-1");
+                yield return null;
+                root.NotifyGameOver(ShadowGarden.Core.GameOverCause.CliffFall);
+                yield return null;
+                root.ReturnToWorldMap();
+                yield return null;
+            }
+
+            Assert.AreEqual(AppState.WorldMap, root.CurrentState);
+            var transforms = Object.FindObjectsByType<Transform>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            Assert.AreEqual(1, System.Linq.Enumerable.Count(transforms, item => item.name == "WorldMapHeader"));
+            Assert.LessOrEqual(System.Linq.Enumerable.Count(transforms, item => item.name == "GameOverNotePanel"), 1);
+            foreach (var parent in transforms)
+            {
+                if (!parent.name.EndsWith("Panel") && !parent.name.EndsWith("Root")) continue;
+                var directNames = System.Linq.Enumerable.Range(0, parent.childCount)
+                    .Select(index => parent.GetChild(index).name)
+                    .ToArray();
+                Assert.AreEqual(directNames.Length, directNames.Distinct().Count(),
+                    $"Duplicate direct child under {parent.name}");
+            }
+        }
+
+        [UnityTest]
         public IEnumerator Buttons_Meet_Min_Height()
         {
             yield return LoadMain();
@@ -95,6 +323,26 @@ namespace ShadowGarden.Tests.PlayMode
                 var rt = button.GetComponent<RectTransform>();
                 Assert.GreaterOrEqual(rt.sizeDelta.y, UiTheme.ButtonMinHeight - 0.1f, button.name);
             }
+        }
+
+        [UnityTest]
+        public IEnumerator Capture_6_1_Flow_Screenshots()
+        {
+            yield return LoadMain();
+            var root = Object.FindFirstObjectByType<MainCompositionRoot>();
+            yield return Capture("6_1_Title");
+
+            root.ReplayOpening();
+            yield return null;
+            yield return Capture("6_1_Opening");
+
+            root.CompleteOpening();
+            yield return null;
+            root.StartStage("1-1");
+            yield return null;
+            root.NotifyGameOver(ShadowGarden.Core.GameOverCause.CliffFall);
+            yield return null;
+            yield return Capture("6_1_GameOver");
         }
 
         [UnityTest]
@@ -126,6 +374,11 @@ namespace ShadowGarden.Tests.PlayMode
             root.StartStage("1-1");
             yield return null;
             yield return null;
+            Screen.SetResolution(1280, 720, FullScreenMode.Windowed);
+            yield return null;
+            yield return Capture("UI_Play_12x6_1280x720");
+            Screen.SetResolution(1920, 1080, FullScreenMode.Windowed);
+            yield return null;
             yield return Capture("UI_Play_12x6");
             root.OpenPause();
             yield return null;
@@ -141,6 +394,11 @@ namespace ShadowGarden.Tests.PlayMode
 
             root.StartStage("3-4");
             yield return null;
+            yield return null;
+            Screen.SetResolution(1280, 720, FullScreenMode.Windowed);
+            yield return null;
+            yield return Capture("UI_Play_18x8_1280x720");
+            Screen.SetResolution(1920, 1080, FullScreenMode.Windowed);
             yield return null;
             yield return Capture("UI_Play_18x8");
             Assert.AreEqual("3-4", root.Gameplay.Definition.StageId);
@@ -212,13 +470,27 @@ namespace ShadowGarden.Tests.PlayMode
 
         private static IEnumerator Capture(string name)
         {
-            var dir = System.IO.Path.Combine(Application.dataPath, "Screenshots", "Stage5");
+            var projectRoot = System.IO.Path.GetFullPath(
+                System.IO.Path.Combine(Application.dataPath, ".."));
+            var dir = System.IO.Path.Combine(projectRoot, "Temp", "ShadowGardenQA");
             System.IO.Directory.CreateDirectory(dir);
             var path = System.IO.Path.Combine(dir, name + ".png");
             ScreenCapture.CaptureScreenshot(path);
             yield return new WaitForEndOfFrame();
             // CaptureScreenshot writes asynchronously; give the file a moment.
             yield return null;
+        }
+
+        private static void AssertInside(RectTransform panel, RectTransform child)
+        {
+            Assert.IsNotNull(child);
+            Assert.IsTrue(child.IsChildOf(panel), $"{child.name} must be parented under {panel.name}.");
+            var bounds = RectTransformUtility.CalculateRelativeRectTransformBounds(panel, child);
+            const float tolerance = 1f;
+            Assert.GreaterOrEqual(bounds.min.x, panel.rect.xMin - tolerance, child.name);
+            Assert.LessOrEqual(bounds.max.x, panel.rect.xMax + tolerance, child.name);
+            Assert.GreaterOrEqual(bounds.min.y, panel.rect.yMin - tolerance, child.name);
+            Assert.LessOrEqual(bounds.max.y, panel.rect.yMax + tolerance, child.name);
         }
 
         private static IEnumerator LoadMain()

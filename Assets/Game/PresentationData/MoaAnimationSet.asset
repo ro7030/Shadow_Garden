@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9fefa3d7bf04044aa83b3be68f71d798, type: 3}
+  m_Name: MoaAnimationSet
+  m_EditorClassIdentifier: ShadowGarden.Presentation::ShadowGarden.Presentation.MoaAnimationSetAsset
+  frontA: {fileID: 21300000, guid: d1dfc2fadca8e4b4e9b77dc6be0aab57, type: 3}
+  frontB: {fileID: 21300000, guid: edd61083372fb49cf9cf028aeb27b6c7, type: 3}
+  backA: {fileID: 21300000, guid: 5ea61fc8ea83c4f3dbc6139a5adf7f8c, type: 3}
+  backB: {fileID: 21300000, guid: 0862ee14e0d044cbc82901fb2f7c6f8c, type: 3}
+  sideA: {fileID: 21300000, guid: e499ea2e867fb4c29b1d03576d146e99, type: 3}
+  sideB: {fileID: 21300000, guid: bd86119ac0953400091fa95c1623f186, type: 3}
+  neutral: {fileID: 21300000, guid: 91a5bbc25101c4a738c0903ecb51043f, type: 3}
+  curious: {fileID: 21300000, guid: af3a2f9cb69624d1cafd8c8a0e459cc5, type: 3}
+  surprised: {fileID: 21300000, guid: b8120ab50bd084cdf828f43bfd79267e, type: 3}
+  worried: {fileID: 21300000, guid: 55ae5bccb151344558012e276016036f, type: 3}
+  determined: {fileID: 21300000, guid: f5315a4b1839b46ba8973e726ba5c468, type: 3}
+  relieved: {fileID: 21300000, guid: 8fa34a59ecfa14aaf9f787f3abc667b8, type: 3}
+  holdSeed: {fileID: 21300000, guid: 707f2881db29448a9b129245654c907f, type: 3}
+  adjustCloak: {fileID: 21300000, guid: ff887f986002d4e218dc96a850983ea7, type: 3}
+  observe: {fileID: 21300000, guid: 2445a9b7c42934e3591f18b8aaf4ca24, type: 3}
+  rotateLamp: {fileID: 21300000, guid: 2e946a8b42e7a4b0a87cac6fb8c94099, type: 3}
+  stepForward: {fileID: 21300000, guid: e2abe5d201aeb4c83b6778d5c82e3451, type: 3}
+  celebrateQuietly: {fileID: 21300000, guid: d181482de8efd45d6990c8fded7d5e67, type: 3}

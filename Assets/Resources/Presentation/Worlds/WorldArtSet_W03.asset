@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 79fae01bd852d486f978a7452b67ce9c, type: 3}
+  m_Name: WorldArtSet_W03
+  m_EditorClassIdentifier: ShadowGarden.Presentation::ShadowGarden.Presentation.WorldArtSetAsset
+  worldNumber: 3
+  worldName: "\uBCC4\uBFCC\uB9AC \uC628\uC2E4"
+  background: {fileID: 21300000, guid: 10eb511968c8247ebbe792d6af518a32, type: 3}
+  boardFrame: {fileID: 21300000, guid: e694ec210746d470daa369594b2d3bd0, type: 3}
+  boardVoid: {fileID: 21300000, guid: fab40cab5ad3b42558ad0b889d69a480, type: 3}
+  safeTile: {fileID: 21300000, guid: 737a6f129592040ea83d1b3886a82ffe, type: 3}
+  safeTileVariant: {fileID: 21300000, guid: 6a874ce616aba471a8f4e06e6d48f210, type: 3}
+  safeTileFlora: {fileID: 21300000, guid: 8770f35c75d9143b99ab1c037d4628d7, type: 3}
+  safeTileFeature: {fileID: 21300000, guid: 6613b191e6b4c40c39ad1d6d8be1295e, type: 3}
+  cliffTile: {fileID: 21300000, guid: 24aad2e09221249a9be6f0a4f3b15a3f, type: 3}
+  backDecor:
+  - {fileID: 21300000, guid: 92f335888604c496abfd1315ce9bc179, type: 3}
+  - {fileID: 21300000, guid: 3878420b989804aa68ee0ed8a113c35b, type: 3}
+  - {fileID: 21300000, guid: 26b2e5fcc4a6346829ba394e4c04b8f6, type: 3}
+  frontDecor:
+  - {fileID: 21300000, guid: 43d2d2210e0714d5793e914401b8cd5d, type: 3}
+  - {fileID: 21300000, guid: a8fb877fa34444021bce6850c5e49ef0, type: 3}
+  - {fileID: 21300000, guid: f97152215b8a249c89a890499ce702af, type: 3}
+  environmentReaction: {fileID: 21300000, guid: 54f2d247eae5942459c252d9b90cbc4c, type: 3}
+  doorClosed: {fileID: 21300000, guid: e1c0a374bc2e14f0794d203e4a31d35a, type: 3}
+  doorOpen: {fileID: 21300000, guid: 46fdf004cefc94166a83ca755c11d88a, type: 3}
+  flowerClosed: {fileID: 21300000, guid: f508a5cd14b6b41d2a55b87268f60004, type: 3}
+  flowerBloom: {fileID: 21300000, guid: 9412d20950bd54aab8e37567e559637b, type: 3}
+  ambientTint: {r: 1, g: 1, b: 1, a: 1}
+  safeTint: {r: 1, g: 1, b: 1, a: 1}
+  shadowTint: {r: 0.14, g: 0.08, b: 0.25, a: 1}
+  reactionTint: {r: 0.78, g: 0.68, b: 1, a: 0.94}
+  ambienceLoop: {fileID: 8300000, guid: 3cd4b9773beed45b4bc2ce5c03a4180a, type: 3}
