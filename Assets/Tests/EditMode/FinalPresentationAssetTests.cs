@@ -55,6 +55,43 @@ namespace ShadowGarden.Tests.EditMode
         }
 
         [Test]
+        public void Pillar_Family_Has_Equal_Diameters_And_Clear_Height_Steps()
+        {
+            var catalog = PresentationAssetLibrary.Catalog;
+            var low = AlphaBounds(catalog.pillarLow);
+            var medium = AlphaBounds(catalog.pillarMedium);
+            var high = AlphaBounds(catalog.pillarHigh);
+
+            Assert.That(low.width, Is.EqualTo(high.width).Within(1), "Low pillar diameter");
+            Assert.That(medium.width, Is.EqualTo(high.width).Within(1), "Medium pillar diameter");
+            Assert.GreaterOrEqual(medium.height - low.height, 40, "Low/medium height must read immediately");
+            Assert.GreaterOrEqual(high.height - medium.height, 40, "Medium/high height must read immediately");
+        }
+
+        private static RectInt AlphaBounds(Sprite sprite)
+        {
+            Assert.IsNotNull(sprite);
+            var texture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+            Assert.IsTrue(texture.LoadImage(File.ReadAllBytes(AssetDatabase.GetAssetPath(sprite))));
+            var minX = texture.width;
+            var minY = texture.height;
+            var maxX = -1;
+            var maxY = -1;
+            for (var y = 0; y < texture.height; y++)
+            for (var x = 0; x < texture.width; x++)
+            {
+                if (texture.GetPixel(x, y).a <= 0.01f) continue;
+                minX = Mathf.Min(minX, x);
+                minY = Mathf.Min(minY, y);
+                maxX = Mathf.Max(maxX, x);
+                maxY = Mathf.Max(maxY, y);
+            }
+
+            Object.DestroyImmediate(texture);
+            return new RectInt(minX, minY, maxX - minX + 1, maxY - minY + 1);
+        }
+
+        [Test]
         public void Runtime_Sprites_Follow_Ppu_Filter_And_Pivot_Contract()
         {
             var guids = AssetDatabase.FindAssets(

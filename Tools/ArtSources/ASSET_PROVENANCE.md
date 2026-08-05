@@ -23,6 +23,14 @@ All 6.1 raster additions were generated specifically for this project with OpenA
 - The former reversed-background foreground fallback is no longer used.
 - W01 avoids a tall foliage strip; W03 avoids free-floating solid crystal debris.
 
+## Unified pillar family
+
+- References: the three project-owned legacy pillar sprites.
+- Rebuilt as one shared cream-stone design with identical base, shaft, cap, camera angle, and 100px visible diameter.
+- Only the authored height changes: low 134px, medium 185px, high 245px inside a common 192×256 canvas.
+- Source and transparent master: `Assets/Game/Art/Source/Common/Pillars/`.
+- Post-process: magenta chroma key, soft matte, equal-width crop, shared bottom-center ground line, Lanczos resize.
+
 ## Deterministic vector source
 
 - `UI/ShadowGardenUiMaster.svg` is a project-authored vector source.

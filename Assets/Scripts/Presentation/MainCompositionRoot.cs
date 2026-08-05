@@ -2,6 +2,7 @@ using ShadowGarden.Core;
 using ShadowGarden.Infrastructure;
 using ShadowGarden.Runtime;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
@@ -54,6 +55,7 @@ namespace ShadowGarden.Presentation
             EnsureFlowScreens();
             EnsureOverlay();
             EnsureScreenArt();
+            ConfigureUiNavigationOwner(AppState.Title);
 
             _flow = new GameFlowController(AppState.Title);
             _flow.StateChanged += OnStateChanged;
@@ -357,6 +359,7 @@ namespace ShadowGarden.Presentation
 
         private void OnStateChanged(AppState from, AppState to)
         {
+            ConfigureUiNavigationOwner(to);
             overlay?.HideAllForStateChange();
             _playPaused = false;
             screenRouter?.Show(to);
@@ -407,6 +410,18 @@ namespace ShadowGarden.Presentation
             // One explicit owner guarantees deterministic layout after every refresh,
             // including Ending -> Title and repeated Opening playback.
             screenArt?.ApplyLayout(to);
+        }
+
+        private static void ConfigureUiNavigationOwner(AppState state)
+        {
+            if (EventSystem.current == null)
+            {
+                return;
+            }
+
+            // Flow screens use MainFlowScreens as the sole keyboard owner. Playing overlays
+            // use the standard EventSystem navigation while gameplay input remains paused.
+            EventSystem.current.sendNavigationEvents = state == AppState.Playing;
         }
 
         private void EnsureCanvas()

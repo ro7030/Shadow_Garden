@@ -391,27 +391,14 @@ namespace ShadowGarden.Presentation
                     ActivateSelectedOrDefault(_titleContinue);
                     break;
                 case AppState.Opening:
-                    AdvanceOpeningOrComplete();
+                    ActivateSelectedOrDefault(_openingContinue);
                     break;
                 case AppState.WorldMap:
-                    if (_worldMapVm != null &&
-                        !string.IsNullOrWhiteSpace(_worldMapVm.FocusedStageId))
-                    {
-                        var node = _worldMapVm.FindFocused();
-                        if (node != null && node.Unlocked)
-                        {
-                            main.StartStage(node.StageId);
-                        }
-                    }
-
+                    ActivateSelectedOrDefault(FocusedWorldMapButton());
                     break;
                 case AppState.GameOver:
                 case AppState.Cleared:
-                    if (_modalVm?.Selected != null)
-                    {
-                        main.ApplyModalSelection(_modalVm.Selected.Id);
-                    }
-
+                    ActivateSelectedOrDefault(SelectedModalButton());
                     break;
                 case AppState.Ending:
                     ActivateSelectedOrDefault(_endingWorldMap);
@@ -923,6 +910,29 @@ namespace ShadowGarden.Presentation
             }
 
             SelectButton(button);
+        }
+
+        private Button FocusedWorldMapButton()
+        {
+            if (_worldMapVm == null || string.IsNullOrWhiteSpace(_worldMapVm.FocusedStageId))
+            {
+                return null;
+            }
+
+            return _stageButtons.TryGetValue(_worldMapVm.FocusedStageId, out var button)
+                ? button
+                : null;
+        }
+
+        private Button SelectedModalButton()
+        {
+            if (_modalButtons.Count == 0)
+            {
+                return null;
+            }
+
+            var index = _modalVm != null ? _modalVm.SelectedIndex : 0;
+            return _modalButtons[Mathf.Clamp(index, 0, _modalButtons.Count - 1)];
         }
 
         private void RebuildModalButtons(GameObject root, ModalViewModel modal)

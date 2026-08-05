@@ -19,6 +19,11 @@ namespace ShadowGarden.Presentation
         private const int ObjectOrder = 40;
         private const int MarkOrder = 60;
         private const int FrontDecorOrder = 82;
+        private static readonly Vector3[] GlyphBoldOffsets =
+        {
+            new(-0.055f, 0f, 0f), new(0.055f, 0f, 0f),
+            new(0f, -0.055f, 0f), new(0f, 0.055f, 0f)
+        };
 
         [SerializeField] private Transform cellRoot;
         [SerializeField] private bool showDebugCounts;
@@ -30,6 +35,7 @@ namespace ShadowGarden.Presentation
         private SpriteRenderer[,] _directionMarks;
         private TextMeshPro[,] _debugLabels;
         private Transform[,] _pillars;
+        private Vector3[,] _pillarBaseScales;
         private GridSize _size;
         private InGameAssetCatalogAsset _catalog;
         private WorldArtSetAsset _world;
@@ -60,6 +66,7 @@ namespace ShadowGarden.Presentation
             _directionMarks = new SpriteRenderer[_size.Width, _size.Height];
             _debugLabels = new TextMeshPro[_size.Width, _size.Height];
             _pillars = new Transform[_size.Width, _size.Height];
+            _pillarBaseScales = new Vector3[_size.Width, _size.Height];
             _pulseTargets.Clear();
             _goalRenderer = null;
             _environmentReactionRenderer = null;
@@ -121,9 +128,10 @@ namespace ShadowGarden.Presentation
 
                         if (channel != null)
                         {
-                            channel.sprite = ChannelSprite(lamp.Channel);
-                            channel.color = MockupPalette.ChannelColor(lamp.Channel);
-                            channel.enabled = channel.sprite != null;
+                            ApplyBoldChannelGlyph(channel, ChannelSprite(lamp.Channel),
+                                MockupPalette.ChannelColor(lamp.Channel));
+                            channel.transform.localPosition = LampGlyphPosition;
+                            channel.transform.localScale = Vector3.one * 0.38f;
                         }
 
                         if (arrow != null)
@@ -131,6 +139,8 @@ namespace ShadowGarden.Presentation
                             arrow.sprite = _catalog != null ? _catalog.lampArrow : null;
                             arrow.color = MockupPalette.ChannelColor(lamp.Channel);
                             arrow.transform.localRotation = DirectionRotation(state.DirectionByChannel[lamp.Channel]);
+                            arrow.transform.localPosition = LampArrowPosition(state.DirectionByChannel[lamp.Channel]);
+                            arrow.transform.localScale = Vector3.one * 0.46f;
                             arrow.enabled = arrow.sprite != null;
                         }
 
@@ -228,11 +238,9 @@ namespace ShadowGarden.Presentation
             var objectRenderer = CreateRenderer(cell.transform, "GameplayObject", ObjectOrder + y * 2, Vector3.one);
             _objects[x, y] = objectRenderer;
             var channel = CreateRenderer(cell.transform, "ChannelMark", MarkOrder + y * 2, Vector3.one * 0.30f);
-            channel.transform.localPosition = new Vector3(-0.29f, -0.31f, 0f);
             channel.enabled = false;
             _channelMarks[x, y] = channel;
-            var direction = CreateRenderer(cell.transform, "DirectionMark", MarkOrder + y * 2 + 1, Vector3.one * 0.35f);
-            direction.transform.localPosition = new Vector3(0.27f, 0.30f, 0f);
+            var direction = CreateRenderer(cell.transform, "DirectionMark", MarkOrder + y * 2 + 1, Vector3.one * 0.46f);
             direction.enabled = false;
             _directionMarks[x, y] = direction;
             _debugLabels[x, y] = CreateDebugLabel(cell.transform);
@@ -241,14 +249,21 @@ namespace ShadowGarden.Presentation
             {
                 objectRenderer.sprite = _catalog?.GetPillar(pillar.Height) ?? _fallbackSprite;
                 objectRenderer.color = Color.white;
-                channel.sprite = ChannelSprite(pillar.Channel);
-                channel.color = MockupPalette.ChannelColor(pillar.Channel);
-                channel.enabled = channel.sprite != null;
+                ApplyBoldChannelGlyph(channel, ChannelSprite(pillar.Channel),
+                    MockupPalette.ChannelColor(pillar.Channel));
+                channel.transform.SetParent(objectRenderer.transform, false);
+                channel.transform.localPosition = PillarGlyphPosition(pillar.Height);
+                channel.transform.localScale = Vector3.one * 0.34f;
+                var pillarScale = Vector3.one;
+                objectRenderer.transform.localScale = pillarScale;
                 _pillars[x, y] = objectRenderer.transform;
+                _pillarBaseScales[x, y] = pillarScale;
             }
             else if (stage.IsLamp(pos))
             {
                 objectRenderer.sprite = _catalog?.lampBody ?? _fallbackSprite;
+                channel.transform.SetParent(objectRenderer.transform, false);
+                direction.transform.SetParent(objectRenderer.transform, false);
             }
             else if (stage.IsGoal(pos))
             {
@@ -380,11 +395,14 @@ namespace ShadowGarden.Presentation
         private IEnumerator PulseChannelRoutine(StageDefinition stage, ChannelId channel, float duration)
         {
             var targets = new List<Transform>();
+            var baseScales = new List<Vector3>();
             foreach (var pillar in stage.Pillars)
             {
                 if (pillar.Channel != channel) continue;
                 var target = _pillars[pillar.Position.X, pillar.Position.Y];
-                if (target != null) targets.Add(target);
+                if (target == null) continue;
+                targets.Add(target);
+                baseScales.Add(_pillarBaseScales[pillar.Position.X, pillar.Position.Y]);
             }
 
             var elapsed = 0f;
@@ -392,11 +410,17 @@ namespace ShadowGarden.Presentation
             {
                 elapsed += Time.unscaledDeltaTime;
                 var scale = _reduceMotion ? 1f : 1f + Mathf.Sin(elapsed * 18f) * 0.07f;
-                foreach (var target in targets) if (target != null) target.localScale = Vector3.one * scale;
+                for (var i = 0; i < targets.Count; i++)
+                {
+                    if (targets[i] != null) targets[i].localScale = baseScales[i] * scale;
+                }
                 yield return null;
             }
 
-            foreach (var target in targets) if (target != null) target.localScale = Vector3.one;
+            for (var i = 0; i < targets.Count; i++)
+            {
+                if (targets[i] != null) targets[i].localScale = baseScales[i];
+            }
         }
 
         private IEnumerator DoorOpenRoutine(float duration)
@@ -500,6 +524,55 @@ namespace ShadowGarden.Presentation
             CardinalDirection.West => Quaternion.Euler(0f, 0f, 90f),
             _ => Quaternion.identity
         };
+
+        private static readonly Vector3 LampGlyphPosition = new(0f, 1.37f, 0f);
+
+        private static Vector3 PillarGlyphPosition(PillarHeight height) => height switch
+        {
+            PillarHeight.Low => new Vector3(0f, 0.82f, 0f),
+            PillarHeight.Medium => new Vector3(0f, 1.22f, 0f),
+            _ => new Vector3(0f, 1.69f, 0f)
+        };
+
+        private static void ApplyBoldChannelGlyph(SpriteRenderer renderer, Sprite sprite, Color color)
+        {
+            if (renderer == null) return;
+            renderer.sprite = sprite;
+            renderer.color = color;
+            renderer.enabled = sprite != null;
+            for (var i = 0; i < GlyphBoldOffsets.Length; i++)
+            {
+                var child = renderer.transform.Find($"Bold_{i}");
+                if (child == null)
+                {
+                    var go = new GameObject($"Bold_{i}");
+                    go.transform.SetParent(renderer.transform, false);
+                    child = go.transform;
+                    go.AddComponent<SpriteRenderer>();
+                }
+
+                child.localPosition = GlyphBoldOffsets[i];
+                child.localScale = Vector3.one;
+                var bold = child.GetComponent<SpriteRenderer>();
+                bold.sprite = sprite;
+                bold.color = color;
+                bold.sortingOrder = renderer.sortingOrder;
+                bold.enabled = sprite != null;
+            }
+        }
+
+        private static Vector3 LampArrowPosition(CardinalDirection direction)
+        {
+            const float centerY = 1.48f;
+            const float radius = 0.58f;
+            return direction switch
+            {
+                CardinalDirection.East => new Vector3(radius, centerY, 0f),
+                CardinalDirection.South => new Vector3(0f, centerY - radius, 0f),
+                CardinalDirection.West => new Vector3(-radius, centerY, 0f),
+                _ => new Vector3(0f, centerY + radius, 0f)
+            };
+        }
 
         private static void FitSprite(SpriteRenderer renderer, float width, float height, bool cover)
         {

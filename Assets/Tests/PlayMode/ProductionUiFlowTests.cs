@@ -6,6 +6,7 @@ using ShadowGarden.Presentation;
 using ShadowGarden.Runtime;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using UnityEngine.UI;
@@ -100,6 +101,38 @@ namespace ShadowGarden.Tests.PlayMode
             var reason = GameObject.Find("ReasonLabel")?.GetComponent<TextMeshProUGUI>();
             Assert.IsNotNull(reason);
             StringAssert.Contains("절벽", reason.text);
+        }
+
+        [UnityTest]
+        public IEnumerator GameOver_Navigation_Keeps_Highlight_And_Enter_Activates_It()
+        {
+            yield return LoadMain();
+            var root = Object.FindFirstObjectByType<MainCompositionRoot>();
+            var screens = Object.FindFirstObjectByType<MainFlowScreens>();
+            root.Save.Preferences.openingSeen = true;
+            root.ContinueFromTitle();
+            yield return null;
+            root.StartStage("1-1");
+            yield return null;
+            root.NotifyGameOver(ShadowGarden.Core.GameOverCause.CliffFall);
+            yield return null;
+
+            Assert.IsFalse(EventSystem.current.sendNavigationEvents,
+                "Flow screens must have one keyboard-navigation owner.");
+            var navigate = typeof(MainFlowScreens).GetMethod(
+                "OnNavigate", BindingFlags.Instance | BindingFlags.NonPublic);
+            var submit = typeof(MainFlowScreens).GetMethod(
+                "OnSubmit", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.IsNotNull(navigate);
+            Assert.IsNotNull(submit);
+
+            navigate.Invoke(screens, new object[] { Vector2.down });
+            yield return null;
+            Assert.AreEqual("WorldMapButton", EventSystem.current.currentSelectedGameObject?.name);
+
+            submit.Invoke(screens, null);
+            yield return null;
+            Assert.AreEqual(AppState.WorldMap, root.CurrentState);
         }
 
         [UnityTest]
@@ -412,6 +445,43 @@ namespace ShadowGarden.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator Channel_Glyphs_Are_Embedded_In_Objects_And_Lamp_Arrow_Is_Emphasized()
+        {
+            yield return LoadMain();
+            var root = Object.FindFirstObjectByType<MainCompositionRoot>();
+            root.Save.Preferences.openingSeen = true;
+            root.ContinueFromTitle();
+            yield return null;
+            root.StartStage("1-3");
+            yield return null;
+
+            foreach (var pillar in root.Gameplay.Definition.Pillars)
+            {
+                var cell = GameObject.Find($"Cell_{pillar.Position.X}_{pillar.Position.Y}");
+                Assert.IsNotNull(cell);
+                Assert.IsNull(cell.transform.Find("ChannelMark"), "No glyph may remain outside on the tile");
+                var glyph = cell.transform.Find("GameplayObject/ChannelMark");
+                Assert.IsNotNull(glyph);
+                Assert.AreEqual(0f, glyph.localPosition.x, 0.01f);
+                Assert.Greater(glyph.localPosition.y, 0.7f);
+                Assert.GreaterOrEqual(glyph.localScale.x, 0.33f);
+                Assert.GreaterOrEqual(glyph.childCount, 4, "Glyph must use the bold renderer treatment");
+            }
+
+            var lamp = root.Gameplay.Definition.Lamps[0];
+            var lampCell = GameObject.Find($"Cell_{lamp.Position.X}_{lamp.Position.Y}");
+            var lampGlyph = lampCell.transform.Find("GameplayObject/ChannelMark");
+            var arrow = lampCell.transform.Find("GameplayObject/DirectionMark");
+            Assert.IsNotNull(lampGlyph);
+            Assert.IsNotNull(arrow);
+            Assert.AreEqual(1.37f, lampGlyph.localPosition.y, 0.02f);
+            Assert.GreaterOrEqual(lampGlyph.localScale.x, 0.37f);
+            Assert.GreaterOrEqual(lampGlyph.childCount, 4, "Lamp glyph must use the bold renderer treatment");
+            Assert.GreaterOrEqual(arrow.localScale.x, 0.45f);
+            Assert.Greater(Vector3.Distance(arrow.localPosition, lampGlyph.localPosition), 0.5f);
+        }
+
+        [UnityTest]
         public IEnumerator Title_Uses_Garden_Enter_Copy()
         {
             yield return LoadMain();
@@ -466,6 +536,32 @@ namespace ShadowGarden.Tests.PlayMode
             var rt = timer.GetComponent<RectTransform>();
             Assert.AreEqual(0.5f, rt.anchorMin.x, 0.01f);
             Assert.AreEqual(1f, rt.anchorMin.y, 0.01f);
+        }
+
+        [UnityTest]
+        public IEnumerator Hud_Side_Panels_Are_Mirrored_And_Content_Stays_Inside()
+        {
+            yield return LoadMain();
+            var root = Object.FindFirstObjectByType<MainCompositionRoot>();
+            root.Save.Preferences.openingSeen = true;
+            root.ContinueFromTitle();
+            yield return null;
+            root.StartStage("1-1");
+            yield return null;
+            yield return null;
+
+            var stagePanel = GameObject.Find("StagePanel")?.GetComponent<RectTransform>();
+            var goalPanel = GameObject.Find("GoalPanel")?.GetComponent<RectTransform>();
+            Assert.IsNotNull(stagePanel);
+            Assert.IsNotNull(goalPanel);
+            Assert.AreEqual(stagePanel.rect.width, goalPanel.rect.width, 0.1f);
+            Assert.AreEqual(stagePanel.rect.height, goalPanel.rect.height, 0.1f);
+            Assert.AreEqual(stagePanel.anchoredPosition.y, goalPanel.anchoredPosition.y, 0.1f);
+            Assert.AreEqual(stagePanel.anchoredPosition.x, -goalPanel.anchoredPosition.x, 0.1f);
+
+            AssertInside(stagePanel, GameObject.Find("StageLabel")?.GetComponent<RectTransform>());
+            AssertInside(goalPanel, GameObject.Find("GoalLabel")?.GetComponent<RectTransform>());
+            AssertInside(goalPanel, GameObject.Find("PauseButton")?.GetComponent<RectTransform>());
         }
 
         private static IEnumerator Capture(string name)

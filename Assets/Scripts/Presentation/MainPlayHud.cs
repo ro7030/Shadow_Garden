@@ -9,6 +9,8 @@ namespace ShadowGarden.Presentation
     /// <summary>Board-safe production HUD with dedicated icon sprites and compact 18x8 layout.</summary>
     public sealed class MainPlayHud : MonoBehaviour
     {
+        private static readonly Vector2 TopSidePanelSize = new(500f, 76f);
+
         [SerializeField] private TextMeshProUGUI stageLabel;
         [SerializeField] private TextMeshProUGUI timerLabel;
         [SerializeField] private TextMeshProUGUI goalLabel;
@@ -54,23 +56,23 @@ namespace ShadowGarden.Presentation
             var skin = PresentationAssetLibrary.Catalog;
 
             _stagePanel = CreateAnchoredPanel("StagePanel", new Vector2(0f, 1f),
-                new Vector2(UiTheme.SafeMargin, -UiTheme.SafeMargin), new Vector2(500f, 76f), new Vector2(0f, 1f));
+                new Vector2(UiTheme.SafeMargin, -UiTheme.SafeMargin), TopSidePanelSize, new Vector2(0f, 1f));
             _timerPanel = CreateAnchoredPanel("TimerPanel", new Vector2(0.5f, 1f),
                 new Vector2(0f, -UiTheme.SafeMargin), new Vector2(238f, 74f), new Vector2(0.5f, 1f));
             _goalPanel = CreateAnchoredPanel("GoalPanel", new Vector2(1f, 1f),
-                new Vector2(-UiTheme.SafeMargin - 72f, -UiTheme.SafeMargin), new Vector2(388f, 76f), new Vector2(1f, 1f));
+                new Vector2(-UiTheme.SafeMargin, -UiTheme.SafeMargin), TopSidePanelSize, new Vector2(1f, 1f));
             _progressPanel = CreateAnchoredPanel("ProgressPanel", new Vector2(1f, 0f),
                 new Vector2(-UiTheme.SafeMargin, UiTheme.SafeMargin), new Vector2(430f, 76f), new Vector2(1f, 0f));
 
-            stageLabel = CreateAnchorLabel(root.transform, "StageLabel", new Vector2(0f, 1f),
-                new Vector2(UiTheme.SafeMargin + 22f, -UiTheme.SafeMargin - 13f), new Vector2(455f, 54f),
-                TextAlignmentOptions.TopLeft, UiTheme.HudFont, true);
+            stageLabel = CreateAnchorLabel(_stagePanel.transform, "StageLabel", new Vector2(0f, 0.5f),
+                new Vector2(22f, 0f), new Vector2(455f, 52f),
+                TextAlignmentOptions.MidlineLeft, UiTheme.HudFont, true);
             timerLabel = CreateAnchorLabel(root.transform, "TimerLabel", new Vector2(0.5f, 1f),
                 new Vector2(0f, -UiTheme.SafeMargin - 12f), new Vector2(210f, 52f),
                 TextAlignmentOptions.Top, UiTheme.TimerFont, true);
-            goalLabel = CreateAnchorLabel(root.transform, "GoalLabel", new Vector2(1f, 1f),
-                new Vector2(-UiTheme.SafeMargin - 102f, -UiTheme.SafeMargin - 17f), new Vector2(292f, 46f),
-                TextAlignmentOptions.TopRight, UiTheme.SubtitleFont, true);
+            goalLabel = CreateAnchorLabel(_goalPanel.transform, "GoalLabel", new Vector2(1f, 0.5f),
+                new Vector2(-78f, 0f), new Vector2(330f, 52f),
+                TextAlignmentOptions.MidlineRight, UiTheme.SubtitleFont, true);
             progressLabel = CreateAnchorLabel(root.transform, "ProgressLabel", new Vector2(1f, 0f),
                 new Vector2(-UiTheme.SafeMargin - 22f, UiTheme.SafeMargin + 14f), new Vector2(202f, 48f),
                 TextAlignmentOptions.BottomRight, UiTheme.BodyFontMin + 1, false);
@@ -96,12 +98,12 @@ namespace ShadowGarden.Presentation
                 nodeRt.anchoredPosition = new Vector2(34f + i * 42f, 0f);
             }
 
-            pauseButton = UiFactory.CreateButton(root.transform, "PauseButton", string.Empty, Vector2.zero,
+            pauseButton = UiFactory.CreateButton(_goalPanel.transform, "PauseButton", string.Empty, Vector2.zero,
                 () => _main?.OpenPause(), width: 56f, height: 56f);
             var pauseRt = pauseButton.GetComponent<RectTransform>();
-            pauseRt.anchorMin = pauseRt.anchorMax = new Vector2(1f, 1f);
-            pauseRt.pivot = new Vector2(1f, 1f);
-            pauseRt.anchoredPosition = new Vector2(-UiTheme.SafeMargin, -UiTheme.SafeMargin);
+            pauseRt.anchorMin = pauseRt.anchorMax = new Vector2(1f, 0.5f);
+            pauseRt.pivot = new Vector2(1f, 0.5f);
+            pauseRt.anchoredPosition = new Vector2(-10f, 0f);
             UiFactory.EnsureIcon(pauseButton.transform, "PauseIcon", skin?.iconPause, new Vector2(24f, 24f));
             WirePause();
         }
@@ -209,11 +211,8 @@ namespace ShadowGarden.Presentation
         {
             SetAnchor(_stagePanel.rectTransform, new Vector2(0f, 1f), new Vector2(margin, -margin));
             SetAnchor(_timerPanel.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -margin));
-            SetAnchor(_goalPanel.rectTransform, new Vector2(1f, 1f), new Vector2(-margin - 72f, -margin));
-            SetAnchor(stageLabel.rectTransform, new Vector2(0f, 1f), new Vector2(margin + 22f, -margin - 13f));
+            SetAnchor(_goalPanel.rectTransform, new Vector2(1f, 1f), new Vector2(-margin, -margin));
             SetAnchor(timerLabel.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -margin - 12f));
-            SetAnchor(goalLabel.rectTransform, new Vector2(1f, 1f), new Vector2(-margin - 102f, -margin - 17f));
-            if (pauseButton != null) pauseButton.GetComponent<RectTransform>().anchoredPosition = new Vector2(-margin, -margin);
         }
 
         private void ApplyTimerWarning(Color color, string message, bool blink)
