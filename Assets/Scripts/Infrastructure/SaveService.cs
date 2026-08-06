@@ -130,24 +130,8 @@ namespace ShadowGarden.Infrastructure
         public bool CanContinue()
         {
             Progress ??= SaveData.CreateDefault();
-            Preferences ??= UiPreferencesData.CreateDefault();
-            if (Preferences.openingSeen)
-            {
-                return true;
-            }
-
-            if (Progress.completedStageIds != null && Progress.completedStageIds.Count > 0)
-            {
-                return true;
-            }
-
-            if (Progress.bestClearMillisecondsByStage != null &&
-                Progress.bestClearMillisecondsByStage.Count > 0)
-            {
-                return true;
-            }
-
-            return false;
+            return Progress.completedStageIds != null &&
+                   Progress.completedStageIds.Contains("1-1");
         }
 
         public void ResetProgressForNewGame()

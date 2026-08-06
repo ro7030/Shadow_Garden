@@ -34,14 +34,37 @@ namespace ShadowGarden.Tests.EditMode
             Assert.AreEqual(1.5f, PresentationTiming.NightFlowerBloomSeconds, 0.01f);
             Assert.AreEqual(0.55f, PresentationTiming.OverlapSinkSeconds, 0.01f);
             Assert.AreEqual(0.65f, PresentationTiming.TimeVacuumSeconds, 0.01f);
+            Assert.AreEqual(0.35f, PresentationTiming.CliffApproachCells, 0.01f);
+            Assert.AreEqual(0.5f, PresentationTiming.CliffFallSeconds, 0.01f);
             Assert.AreEqual(0.45f, PresentationTiming.DoorOpenSeconds, 0.01f);
             Assert.AreEqual(0.35f, PresentationTiming.GoalPassSeconds, 0.01f);
+            Assert.AreEqual(10f, PresentationTiming.EndingBeatSeconds, 0.01f);
+            Assert.AreEqual(10f,
+                PresentationTiming.EndingWorldRecoverSeconds + PresentationTiming.EndingCelebrateSeconds, 0.01f);
         }
 
         [Test]
         public void MainCompositionRoot_Exposes_Pause_Retry()
         {
             Assert.IsNotNull(typeof(MainCompositionRoot).GetMethod("RetryFromPause"));
+        }
+
+        [Test]
+        public void Secondary_Button_Tint_Is_Visible_On_White()
+        {
+            var go = new GameObject("SecondaryTintButton", typeof(RectTransform), typeof(Image), typeof(Button));
+            try
+            {
+                var button = go.GetComponent<Button>();
+                UiFactory.ApplyButtonColorTint(button, secondary: true);
+                Assert.Less(button.colors.highlightedColor.maxColorComponent, 1f);
+                Assert.Less(button.colors.selectedColor.maxColorComponent, 1f);
+                Assert.Less(button.colors.pressedColor.maxColorComponent, 1f);
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
         }
 
         [Test]

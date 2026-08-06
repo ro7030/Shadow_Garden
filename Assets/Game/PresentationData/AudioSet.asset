@@ -12,10 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6902f163ea9274aab9f98ed9f850c52e, type: 3}
   m_Name: AudioSet
   m_EditorClassIdentifier: ShadowGarden.Presentation::ShadowGarden.Presentation.AudioSetAsset
-  commonMotif: {fileID: 8300000, guid: 15d6eb3bce6c4459c8e79b6dbac6b412, type: 3}
-  orchardLayer: {fileID: 8300000, guid: 0ef0c423cd603498ea8dde5f64b09a36, type: 3}
-  canyonLayer: {fileID: 8300000, guid: 4d3e544e985c849ba9aa4bc51f0643ec, type: 3}
-  greenhouseLayer: {fileID: 8300000, guid: ed179931c3827414e9ba5e8598e61c8f, type: 3}
+  commonMotif: {fileID: 8300000, guid: c50866cb66a574524af93e94f9611bf4, type: 3}
+  orchardLayer: {fileID: 8300000, guid: 924ad054f517d4330977a658c305a88b, type: 3}
+  canyonLayer: {fileID: 8300000, guid: c6c8462b0e3e0458b98d62c9a398742c, type: 3}
+  greenhouseLayer: {fileID: 8300000, guid: ec0c068ea9e0b4160a9524b547a076f6, type: 3}
   orchardAmbience: {fileID: 8300000, guid: 13235f6f50de84d809a14aca0434915b, type: 3}
   canyonAmbience: {fileID: 8300000, guid: 158692a0fe038417da44e2622b080aed, type: 3}
   greenhouseAmbience: {fileID: 8300000, guid: 3cd4b9773beed45b4bc2ce5c03a4180a, type: 3}

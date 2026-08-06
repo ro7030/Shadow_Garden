@@ -17,6 +17,7 @@ namespace ShadowGarden.Tests.PlayMode
             var root = Object.FindFirstObjectByType<MainCompositionRoot>();
             Assert.IsNotNull(root);
             root.Save.Preferences.openingSeen = true;
+            root.Save.RecordStageCleared("1-1", 9000);
             root.ContinueFromTitle();
             yield return null;
             Assert.AreEqual(AppState.WorldMap, root.CurrentState);

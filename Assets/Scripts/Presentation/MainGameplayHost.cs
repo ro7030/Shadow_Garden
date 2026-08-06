@@ -55,6 +55,10 @@ namespace ShadowGarden.Presentation
 
         public void ApplyAudioPreferences() => presentationAudio?.ApplyPreferences();
 
+        public void UnlockAudioFromUserGesture() => presentationAudio?.UnlockFromUserInteraction();
+
+        public void PlayMenuMusic() => presentationAudio?.PlayMenuMusic();
+
         public void Bind(MainCompositionRoot main)
         {
             UnsubscribeInput();
@@ -124,7 +128,10 @@ namespace ShadowGarden.Presentation
                 : definition.BoardSize.Width > 12 || definition.BoardSize.Height > 6
                     ? 1.55f
                     : BoardCameraFitter.DefaultPaddingCells;
-            BoardCameraFitter.Apply(Camera.main, definition.BoardSize, boardPadding);
+            var topVisualOverflow = definition.BoardSize.Width == 12 && definition.BoardSize.Height == 6
+                ? 1.5f
+                : 0f;
+            BoardCameraFitter.Apply(Camera.main, definition.BoardSize, boardPadding, topVisualOverflow);
             ApplyCameraLook();
 
             _main?.Input?.EnableGameplay(true);
@@ -150,6 +157,7 @@ namespace ShadowGarden.Presentation
             _active = false;
             playHud?.SetVisible(false);
             _main?.Input?.EnableGameplay(false);
+            presentationAudio?.PlayMenuMusic();
         }
 
         private void Awake()

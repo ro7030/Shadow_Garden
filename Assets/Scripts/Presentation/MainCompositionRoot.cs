@@ -32,6 +32,7 @@ namespace ShadowGarden.Presentation
         private long _lastClearElapsedMs;
         private GameOverCause _lastGameOverCause = GameOverCause.CliffFall;
         private bool _playPaused;
+        private bool _openingReturnToTitle;
 
         public GameFlowController Flow => _flow;
         public SaveService Save => _save;
@@ -48,6 +49,9 @@ namespace ShadowGarden.Presentation
 
         private void Awake()
         {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            WebGLInput.captureAllKeyboardInput = false;
+#endif
             UiTypography.ApplyDefaultSettings();
             EnsureCanvas();
             EnsureScreenRouter();
@@ -63,6 +67,7 @@ namespace ShadowGarden.Presentation
             if (inputActions != null)
             {
                 _input = new InputRouter(inputActions);
+                _input.PauseRequested += TogglePauseFromInput;
             }
 
             _save = usePlayerPrefs
@@ -89,6 +94,16 @@ namespace ShadowGarden.Presentation
             flowScreens?.RefreshWorldMapUnlock();
             // Flow refreshes may rebuild or reparent controls; layout is always the last step.
             screenArt?.ApplyLayout(CurrentState);
+            if (CurrentState != AppState.Playing)
+            {
+                gameplayHost?.PlayMenuMusic();
+            }
+        }
+
+        /// <summary>WebGL shell / first-gesture bridge — unlocks audio after a user click.</summary>
+        public void UnlockAudioFromWebShell()
+        {
+            gameplayHost?.UnlockAudioFromUserGesture();
         }
 
         private void OnDestroy()
@@ -99,7 +114,11 @@ namespace ShadowGarden.Presentation
             }
 
             flowScreens?.UnbindInput();
-            _input?.Dispose();
+            if (_input != null)
+            {
+                _input.PauseRequested -= TogglePauseFromInput;
+                _input.Dispose();
+            }
         }
 
         public void BindForTests(
@@ -163,27 +182,33 @@ namespace ShadowGarden.Presentation
 
         public void ContinueFromTitle()
         {
-            if (_save?.Preferences != null && _save.Preferences.openingSeen)
+            if (_save == null || !_save.CanContinue())
             {
-                RequestState(AppState.WorldMap);
+                return;
             }
-            else
-            {
-                RequestState(AppState.Opening);
-            }
+
+            RequestState(AppState.WorldMap);
         }
 
         public void StartNewGameFromTitle()
         {
-            // UI/UX §15: 「새로 선택」 → WorldMap 첫 해금 노드 (오프닝 강제 재생 아님).
+            // 「처음 시작하기」 → 오프닝 재생 후 레벨 선택.
             _save?.ResetProgressForNewGame();
             _pendingStageId = "1-1";
-            RequestState(AppState.WorldMap);
+            _openingReturnToTitle = false;
+            RequestState(AppState.Opening);
         }
 
         public void CompleteOpening()
         {
             _save?.MarkOpeningSeen();
+            if (_openingReturnToTitle)
+            {
+                _openingReturnToTitle = false;
+                RequestState(AppState.Title);
+                return;
+            }
+
             RequestState(AppState.WorldMap);
         }
 
@@ -191,12 +216,23 @@ namespace ShadowGarden.Presentation
         {
             overlay?.HideAllForStateChange();
             _playPaused = false;
+            _openingReturnToTitle = true;
             if (CurrentState == AppState.Playing)
             {
-                RequestState(AppState.WorldMap);
+                RequestState(AppState.Title);
             }
 
-            RequestState(AppState.Opening);
+            if (CurrentState != AppState.Opening)
+            {
+                RequestState(AppState.Opening);
+            }
+        }
+
+        public void ReturnToTitle()
+        {
+            overlay?.HideAllForStateChange();
+            _playPaused = false;
+            RequestState(AppState.Title);
         }
 
         public void OpenSettingsFromTitle()
@@ -211,11 +247,56 @@ namespace ShadowGarden.Presentation
             overlay?.OpenPause();
         }
 
+        /// <summary>Esc and the HUD pause button share this toggle path.</summary>
+        public void TogglePauseFromInput()
+        {
+            EnsureOverlay();
+            if (overlay == null || CurrentState != AppState.Playing)
+            {
+                return;
+            }
+
+            if (overlay.IsFocusOverlayVisible)
+            {
+                return;
+            }
+
+            if (overlay.IsSettingsOpen)
+            {
+                overlay.CloseSettings();
+                return;
+            }
+
+            if (overlay.IsPauseOpen)
+            {
+                overlay.ClosePause(true);
+                return;
+            }
+
+            overlay.OpenPause();
+        }
+
         public void SetPlayPaused(bool paused)
         {
             _playPaused = paused;
             gameplayHost?.SetExternalPause(paused);
-            _input?.EnableGameplay(!paused && CurrentState == AppState.Playing);
+            if (CurrentState != AppState.Playing || _input == null)
+            {
+                return;
+            }
+
+            if (paused)
+            {
+                // Pause/settings overlays need UI Navigate/Submit; Esc pause toggle stays armed.
+                _input.SetPauseAvailableInUi(true);
+                _input.SetMapMode(InputMapMode.Ui);
+            }
+            else
+            {
+                _input.SetPauseAvailableInUi(false);
+                _input.EnableGameplay(true);
+                _input.SetMapMode(InputMapMode.Gameplay);
+            }
         }
 
         public void ApplyUiPreferences()
@@ -362,6 +443,7 @@ namespace ShadowGarden.Presentation
             ConfigureUiNavigationOwner(to);
             overlay?.HideAllForStateChange();
             _playPaused = false;
+            _input?.SetPauseAvailableInUi(false);
             screenRouter?.Show(to);
             _input?.SetTransitionInputLock(false);
             _input?.ApplyForAppState(to);
@@ -389,16 +471,24 @@ namespace ShadowGarden.Presentation
             if (to == AppState.Title)
             {
                 flowScreens?.RefreshTitleBranch();
+                gameplayHost?.PlayMenuMusic();
             }
 
             if (to == AppState.WorldMap)
             {
                 flowScreens?.RefreshWorldMapUnlock();
+                gameplayHost?.PlayMenuMusic();
             }
 
             if (to == AppState.Opening)
             {
                 flowScreens?.RefreshOpening();
+                gameplayHost?.PlayMenuMusic();
+            }
+
+            if (to == AppState.Ending)
+            {
+                gameplayHost?.PlayMenuMusic();
             }
 
             if (to == AppState.GameOver || to == AppState.Cleared || to == AppState.Ending)

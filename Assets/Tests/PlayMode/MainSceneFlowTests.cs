@@ -50,7 +50,23 @@ namespace ShadowGarden.Tests.PlayMode
             var first = Object.FindFirstObjectByType<MainCompositionRoot>();
             Assert.IsNotNull(first);
             // Force Opening regardless of persisted openingSeen.
-            Assert.IsTrue(first.RequestState(AppState.Opening).Accepted);
+            if (first.CurrentState != AppState.Opening)
+            {
+                if (first.CurrentState == AppState.WorldMap)
+                {
+                    Assert.IsTrue(first.RequestState(AppState.Opening).Accepted);
+                }
+                else if (first.CurrentState == AppState.Title)
+                {
+                    Assert.IsTrue(first.RequestState(AppState.Opening).Accepted);
+                }
+                else
+                {
+                    Assert.IsTrue(first.RequestState(AppState.WorldMap).Accepted);
+                    Assert.IsTrue(first.RequestState(AppState.Opening).Accepted);
+                }
+            }
+
             yield return null;
             Assert.AreEqual(AppState.Opening, first.CurrentState);
 

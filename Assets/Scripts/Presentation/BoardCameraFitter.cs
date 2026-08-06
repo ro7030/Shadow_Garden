@@ -26,21 +26,31 @@ namespace ShadowGarden.Presentation
             GridSize boardSize,
             float availableAspect,
             float cellSize = GridWorld.CellSize,
-            float paddingCells = DefaultPaddingCells)
+            float paddingCells = DefaultPaddingCells,
+            float topVisualOverflowCells = 0f)
         {
             if (availableAspect <= 0.01f)
             {
                 availableAspect = 16f / 9f;
             }
 
-            var halfVertical = boardSize.Height * cellSize * 0.5f + paddingCells * cellSize;
-            var halfHorizontal = boardSize.Width * cellSize / (2f * availableAspect) + paddingCells * cellSize;
+            topVisualOverflowCells = Mathf.Max(0f, topVisualOverflowCells);
+            var halfVertical = boardSize.Height * cellSize * 0.5f
+                + paddingCells * cellSize
+                + topVisualOverflowCells * cellSize * 0.5f;
+            var halfHorizontal = boardSize.Width * cellSize / (2f * availableAspect)
+                + paddingCells * cellSize;
             var ortho = Mathf.Max(halfVertical, halfHorizontal);
             var center = GridWorld.BoardCenter(boardSize);
+            center.y += topVisualOverflowCells * cellSize * 0.5f;
             return new Framing(new Vector3(center.x, center.y, -10f), ortho);
         }
 
-        public static void Apply(Camera camera, GridSize boardSize, float paddingCells = DefaultPaddingCells)
+        public static void Apply(
+            Camera camera,
+            GridSize boardSize,
+            float paddingCells = DefaultPaddingCells,
+            float topVisualOverflowCells = 0f)
         {
             if (camera == null)
             {
@@ -48,7 +58,7 @@ namespace ShadowGarden.Presentation
             }
 
             var aspect = camera.aspect > 0.01f ? camera.aspect : 16f / 9f;
-            var framing = Calculate(boardSize, aspect, GridWorld.CellSize, paddingCells);
+            var framing = Calculate(boardSize, aspect, GridWorld.CellSize, paddingCells, topVisualOverflowCells);
             camera.orthographic = true;
             camera.orthographicSize = framing.OrthographicSize;
             camera.transform.position = framing.Center;

@@ -13,6 +13,7 @@ namespace ShadowGarden.Presentation
         private AudioSetAsset _set;
         private MainCompositionRoot _main;
         private string _pendingStageId;
+        private bool _menuMode = true;
         private bool _interactionUnlocked;
         private float _lastUiMoveAt = -10f;
         private float _lastUiSubmitAt = -10f;
@@ -24,13 +25,25 @@ namespace ShadowGarden.Presentation
             ApplyPreferences();
         }
 
+        public void PlayMenuMusic()
+        {
+            EnsureSources();
+            _set = PresentationAssetLibrary.Catalog?.audio;
+            _menuMode = true;
+            _pendingStageId = null;
+            if (_set == null) return;
+            if (_interactionUnlocked) StartMenuLoop();
+            ApplyPreferences();
+        }
+
         public void BeginStage(string stageId)
         {
             EnsureSources();
             _set = PresentationAssetLibrary.Catalog?.audio;
             _pendingStageId = stageId;
+            _menuMode = false;
             if (_set == null) return;
-            if (_interactionUnlocked) StartPendingLoops();
+            if (_interactionUnlocked) StartStageLoops();
             ApplyPreferences();
         }
 
@@ -40,9 +53,10 @@ namespace ShadowGarden.Presentation
             var preferences = _main?.Save?.Preferences;
             var bgm = preferences != null ? Mathf.Clamp01(preferences.bgmVolume) : 0.7f;
             var sfx = preferences != null ? Mathf.Clamp01(preferences.sfxVolume) : 0.8f;
-            _motif.volume = bgm * 0.18f;
-            _worldMusic.volume = bgm * 0.30f;
-            _ambience.volume = bgm * 0.16f;
+            // Full replacement BGMs play on the world channel; motif stays silent to avoid stacking.
+            _motif.volume = 0f;
+            _worldMusic.volume = bgm * 0.55f;
+            _ambience.volume = _menuMode ? 0f : bgm * 0.16f;
             _sfx.volume = sfx * 0.82f;
         }
 
@@ -78,18 +92,33 @@ namespace ShadowGarden.Presentation
 
         public AudioSetAsset Clips => _set ??= PresentationAssetLibrary.Catalog?.audio;
 
-        private void UnlockFromUserInteraction()
+        public void UnlockFromUserInteraction()
         {
             if (_interactionUnlocked) return;
             _interactionUnlocked = true;
-            StartPendingLoops();
+            if (_menuMode || string.IsNullOrWhiteSpace(_pendingStageId))
+            {
+                StartMenuLoop();
+            }
+            else
+            {
+                StartStageLoops();
+            }
         }
 
-        private void StartPendingLoops()
+        private void StartMenuLoop()
+        {
+            if (!_interactionUnlocked || _set == null) return;
+            StopSource(_motif);
+            StopSource(_ambience);
+            PlayLoop(_worldMusic, _set.commonMotif);
+        }
+
+        private void StartStageLoops()
         {
             if (!_interactionUnlocked || _set == null || string.IsNullOrWhiteSpace(_pendingStageId)) return;
             var world = PresentationAssetLibrary.ParseWorld(_pendingStageId);
-            PlayLoop(_motif, _set.commonMotif);
+            StopSource(_motif);
             PlayLoop(_worldMusic, _set.GetWorldMusic(world));
             PlayLoop(_ambience, _set.GetWorldAmbience(world));
         }
@@ -131,6 +160,13 @@ namespace ShadowGarden.Presentation
             source.Stop();
             source.clip = clip;
             source.Play();
+        }
+
+        private static void StopSource(AudioSource source)
+        {
+            if (source == null) return;
+            source.Stop();
+            source.clip = null;
         }
     }
 }

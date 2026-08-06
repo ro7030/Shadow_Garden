@@ -6,7 +6,7 @@ using UnityEngine.UI;
 namespace ShadowGarden.Presentation
 {
     /// <summary>
-    /// Playing overlays: pause (screen button only — no Esc), settings, focus-return.
+    /// Playing overlays: pause (screen button + Esc), settings, focus-return.
     /// </summary>
     public sealed class MainOverlayController : MonoBehaviour
     {
@@ -159,71 +159,150 @@ namespace ShadowGarden.Presentation
         private GameObject BuildPause()
         {
             var panel = UiFactory.CreatePanel(_root.transform, "PausePanel", UiTheme.Panel,
-                new Vector2(480f, 420f), Vector2.zero).gameObject;
+                new Vector2(480f, 520f), Vector2.zero).gameObject;
             UiFactory.CreateLabel(panel.transform, "Title", "일시정지",
-                new Vector2(0f, 150f), new Vector2(400f, 48f), UiTheme.TitleFont * 0.6f, true);
-            UiFactory.CreateButton(panel.transform, "ResumeButton", "계속하기",
-                new Vector2(0f, 60f), () => ClosePause(true));
-            UiFactory.CreateButton(panel.transform, "RetryButton", "다시 도전",
-                new Vector2(0f, 0f), () => _main?.RetryFromPause());
-            UiFactory.CreateButton(panel.transform, "WorldMapButton", "레벨 선택",
-                new Vector2(0f, -60f), () =>
+                new Vector2(0f, 190f), new Vector2(400f, 48f), UiTheme.TitleFont * 0.6f, true);
+            var resume = UiFactory.CreateButton(panel.transform, "ResumeButton", "계속하기",
+                new Vector2(0f, 100f), () => ClosePause(true), forceSecondary: true);
+            var retry = UiFactory.CreateButton(panel.transform, "RetryButton", "다시 도전",
+                new Vector2(0f, 40f), () => _main?.RetryFromPause(), forceSecondary: true);
+            var worldMap = UiFactory.CreateButton(panel.transform, "WorldMapButton", "레벨 선택",
+                new Vector2(0f, -20f), () =>
                 {
                     ClosePause(false);
                     _main?.ReturnToWorldMap();
-                });
-            UiFactory.CreateButton(panel.transform, "SettingsButton", "설정",
-                new Vector2(0f, -120f), () => OpenSettings(AppState.Playing));
+                }, forceSecondary: true);
+            var title = UiFactory.CreateButton(panel.transform, "TitleButton", "타이틀로 돌아가기",
+                new Vector2(0f, -80f), () =>
+                {
+                    ClosePause(false);
+                    _main?.ReturnToTitle();
+                }, forceSecondary: true);
+            var settings = UiFactory.CreateButton(panel.transform, "SettingsButton", "설정",
+                new Vector2(0f, -140f), () => OpenSettings(AppState.Playing), forceSecondary: true);
+            // Explicit chain so HUD PauseButton / other Playing selectables cannot steal focus.
+            BindVerticalNavigation(resume, retry, worldMap, title, settings);
             return panel;
+        }
+
+        private static void BindVerticalNavigation(params Button[] buttons)
+        {
+            for (var i = 0; i < buttons.Length; i++)
+            {
+                var button = buttons[i];
+                if (button == null)
+                {
+                    continue;
+                }
+
+                var nav = new Navigation
+                {
+                    mode = Navigation.Mode.Explicit,
+                    selectOnUp = i > 0 ? buttons[i - 1] : null,
+                    selectOnDown = i < buttons.Length - 1 ? buttons[i + 1] : null
+                };
+                button.navigation = nav;
+            }
         }
 
         private GameObject BuildSettings()
         {
             var panel = UiFactory.CreatePanel(_root.transform, "SettingsPanel", UiTheme.Panel,
-                new Vector2(640f, 620f), Vector2.zero).gameObject;
+                new Vector2(640f, 560f), Vector2.zero).gameObject;
             UiFactory.CreateLabel(panel.transform, "Title", "설정",
-                new Vector2(0f, 250f), new Vector2(520f, 48f), UiTheme.TitleFont * 0.55f, true);
+                new Vector2(0f, 210f), new Vector2(520f, 48f), UiTheme.TitleFont * 0.55f, true);
 
             UiFactory.CreateLabel(panel.transform, "BgmLabel", "BGM",
-                new Vector2(-200f, 170f), new Vector2(120f, 32f), UiTheme.BodyFontMin + 4, false,
+                new Vector2(-200f, 140f), new Vector2(120f, 32f), UiTheme.BodyFontMin + 4, false,
                 TextAlignmentOptions.MidlineLeft);
-            _bgmSlider = CreateSlider(panel.transform, "BgmSlider", new Vector2(40f, 170f));
+            _bgmSlider = CreateSlider(panel.transform, "BgmSlider", new Vector2(40f, 140f));
             _bgmSlider.value = 0.7f;
 
             UiFactory.CreateLabel(panel.transform, "SfxLabel", "효과음",
-                new Vector2(-200f, 110f), new Vector2(120f, 32f), UiTheme.BodyFontMin + 4, false,
+                new Vector2(-200f, 80f), new Vector2(120f, 32f), UiTheme.BodyFontMin + 4, false,
                 TextAlignmentOptions.MidlineLeft);
-            _sfxSlider = CreateSlider(panel.transform, "SfxSlider", new Vector2(40f, 110f));
+            _sfxSlider = CreateSlider(panel.transform, "SfxSlider", new Vector2(40f, 80f));
             _sfxSlider.value = 0.8f;
 
             _fullscreenToggle = CreateToggle(panel.transform, "FullscreenToggle",
-                new Vector2(-220f, 40f));
+                new Vector2(-220f, 10f));
             UiFactory.CreateLabel(panel.transform, "FullscreenLabel", "전체화면",
-                new Vector2(20f, 40f), new Vector2(360f, 44f), UiTheme.BodyFontMin + 2, false,
+                new Vector2(20f, 10f), new Vector2(360f, 44f), UiTheme.BodyFontMin + 2, false,
                 TextAlignmentOptions.MidlineLeft);
 
             _reduceMotionToggle = CreateToggle(panel.transform, "ReduceMotionToggle",
-                new Vector2(-220f, -20f));
+                new Vector2(-220f, -50f));
             UiFactory.CreateLabel(panel.transform, "ReduceMotionLabel", "모션 완화 (점멸·맥동 제거)",
-                new Vector2(40f, -20f), new Vector2(400f, 44f), UiTheme.BodyFontMin + 2, false,
+                new Vector2(40f, -50f), new Vector2(400f, 44f), UiTheme.BodyFontMin + 2, false,
                 TextAlignmentOptions.MidlineLeft);
 
             _controlsLabel = UiFactory.CreateLabel(panel.transform, "ControlsLabel",
-                "조작 확인\nWASD 이동 · Q/E 태양등 회전 · R 다시 도전\n방향키·Enter 메뉴 · 일시정지는 화면 버튼",
-                new Vector2(0f, -110f), new Vector2(560f, 100f), UiTheme.BodyFontMin + 2, false);
+                "조작 확인\nWASD 이동 · Q/E 태양등 회전 · R 다시 도전\n방향키·Enter 메뉴 · 일시정지는 Esc·화면 버튼",
+                new Vector2(0f, -140f), new Vector2(560f, 100f), UiTheme.BodyFontMin + 2, false);
 
-            UiFactory.CreateButton(panel.transform, "ReplayOpeningButton", "오프닝 다시 보기",
-                new Vector2(0f, -190f), () =>
-                {
-                    PersistSettings();
-                    HideAll();
-                    _paused = false;
-                    _settingsOpen = false;
-                    _main?.ReplayOpening();
-                });
-            UiFactory.CreateButton(panel.transform, "CloseButton", "닫기",
-                new Vector2(0f, -260f), CloseSettings);
+            UiFactory.CreateButton(panel.transform, "CloseButton", "저장",
+                new Vector2(0f, -220f), CloseSettings);
+
+            WireSettingsLiveListeners();
             return panel;
+        }
+
+        private void WireSettingsLiveListeners()
+        {
+            if (_bgmSlider != null)
+            {
+                _bgmSlider.onValueChanged.RemoveAllListeners();
+                _bgmSlider.onValueChanged.AddListener(_ => ApplySettingsLive());
+            }
+
+            if (_sfxSlider != null)
+            {
+                _sfxSlider.onValueChanged.RemoveAllListeners();
+                _sfxSlider.onValueChanged.AddListener(_ => ApplySettingsLive());
+            }
+
+            if (_fullscreenToggle != null)
+            {
+                _fullscreenToggle.onValueChanged.RemoveAllListeners();
+                _fullscreenToggle.onValueChanged.AddListener(_ => ApplySettingsLive());
+            }
+
+            if (_reduceMotionToggle != null)
+            {
+                _reduceMotionToggle.onValueChanged.RemoveAllListeners();
+                _reduceMotionToggle.onValueChanged.AddListener(_ => ApplySettingsLive());
+            }
+        }
+
+        private void ApplySettingsLive()
+        {
+            var prefs = _main?.Save?.Preferences;
+            if (prefs == null)
+            {
+                return;
+            }
+
+            if (_bgmSlider != null)
+            {
+                prefs.bgmVolume = _bgmSlider.value;
+            }
+
+            if (_sfxSlider != null)
+            {
+                prefs.sfxVolume = _sfxSlider.value;
+            }
+
+            if (_reduceMotionToggle != null)
+            {
+                prefs.reduceMotion = _reduceMotionToggle.isOn;
+            }
+
+            if (_fullscreenToggle != null)
+            {
+                Screen.fullScreen = _fullscreenToggle.isOn;
+            }
+
+            _main.ApplyUiPreferences();
         }
 
         private GameObject BuildFocus()
@@ -365,6 +444,41 @@ namespace ShadowGarden.Presentation
             {
                 _fullscreenToggle.SetIsOnWithoutNotify(Screen.fullScreen);
             }
+
+            // Rebuild may leave stale copy on already-created buttons after domain changes.
+            SetButtonLabel(_settingsPanel, "CloseButton", "저장");
+            if (_controlsLabel != null)
+            {
+                _controlsLabel.text =
+                    "조작 확인\nWASD 이동 · Q/E 태양등 회전 · R 다시 도전\n방향키·Enter 메뉴 · 일시정지는 Esc·화면 버튼";
+                UiTypography.Apply(_controlsLabel, bold: false);
+            }
+
+            var legacyReplay = _settingsPanel != null
+                ? _settingsPanel.transform.Find("ReplayOpeningButton")
+                : null;
+            if (legacyReplay != null)
+            {
+                legacyReplay.gameObject.SetActive(false);
+            }
+        }
+
+        private static void SetButtonLabel(GameObject panel, string buttonName, string text)
+        {
+            if (panel == null)
+            {
+                return;
+            }
+
+            var button = panel.transform.Find(buttonName);
+            var label = button != null ? button.GetComponentInChildren<TextMeshProUGUI>(true) : null;
+            if (label == null)
+            {
+                return;
+            }
+
+            label.text = text;
+            UiTypography.Apply(label, bold: true);
         }
 
         private void PersistSettings()

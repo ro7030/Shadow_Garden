@@ -17,10 +17,22 @@ namespace ShadowGarden.Tests.PlayMode
             yield return LoadMain();
             var root = Object.FindFirstObjectByType<MainCompositionRoot>();
             Assert.IsNotNull(root);
+            root.Save.Preferences.openingSeen = true;
+            if (root.CurrentState == AppState.Opening)
+            {
+                root.CompleteOpening();
+                yield return null;
+                Assert.IsTrue(root.RequestState(AppState.Title).Accepted);
+            }
+            else if (root.CurrentState != AppState.Title)
+            {
+                Assert.IsTrue(root.RequestState(AppState.Title).Accepted);
+            }
+
             Assert.AreEqual(AppState.Title, root.CurrentState);
 
-            // Skip opening for deterministic flow
-            root.Save.Preferences.openingSeen = true;
+            // Continue requires 1-1 clear; seed progress for deterministic continue path.
+            root.Save.RecordStageCleared("1-1", 9000);
             root.ContinueFromTitle();
             yield return null;
             Assert.AreEqual(AppState.WorldMap, root.CurrentState);
@@ -160,6 +172,7 @@ namespace ShadowGarden.Tests.PlayMode
             yield return LoadMain();
             var root = Object.FindFirstObjectByType<MainCompositionRoot>();
             root.Save.Preferences.openingSeen = true;
+            root.Save.RecordStageCleared("1-1", 9000);
             root.ContinueFromTitle();
             yield return null;
             root.StartStage("1-1");

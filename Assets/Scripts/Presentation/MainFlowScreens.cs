@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using ShadowGarden.Core;
 using TMPro;
@@ -23,11 +24,12 @@ namespace ShadowGarden.Presentation
         private Button _titleReplayOpening;
         private Button _titleSettings;
         private TextMeshProUGUI _titleProgressLabel;
-        private TextMeshProUGUI _titleConceptLabel;
         private Button _openingContinue;
         private Button _openingSkip;
         private TextMeshProUGUI _openingBody;
         private TextMeshProUGUI _openingPageLabel;
+        private TextMeshProUGUI _openingHoldHint;
+        private Image _openingHoldTrack;
         private Image _openingHoldFill;
         private int _openingPage;
         private float _openingHoldSeconds;
@@ -36,7 +38,9 @@ namespace ShadowGarden.Presentation
         private Button _endingTitle;
         private TextMeshProUGUI _gameOverReason;
         private TextMeshProUGUI _clearedDetail;
-        private TextMeshProUGUI _endingCredits;
+        private TextMeshProUGUI _endingBody;
+        private Coroutine _endingBeatRoutine;
+        private bool _endingBeatComplete;
 
         private readonly Dictionary<string, Button> _stageButtons = new Dictionary<string, Button>();
         private readonly List<Button> _modalButtons = new List<Button>();
@@ -50,6 +54,7 @@ namespace ShadowGarden.Presentation
 
         public WorldMapViewModel CurrentWorldMap => _worldMapVm;
         public ModalViewModel CurrentModal => _modalVm;
+        public bool IsEndingBeatComplete => _endingBeatComplete;
 
         public void Bind(MainCompositionRoot compositionRoot, AppScreenRouter screenRouter)
         {
@@ -88,17 +93,24 @@ namespace ShadowGarden.Presentation
             if (_titleContinue != null)
             {
                 _titleContinue.gameObject.SetActive(true);
+                _titleContinue.interactable = canContinue;
                 var label = _titleContinue.GetComponentInChildren<TextMeshProUGUI>(true);
                 if (label != null)
                 {
-                    label.text = canContinue ? "정원으로 돌아가기" : "정원 들어가기";
+                    label.text = "정원으로 돌아가기";
                     UiTypography.Apply(label, bold: true);
                 }
             }
 
             if (_titleNewGame != null)
             {
-                _titleNewGame.gameObject.SetActive(canContinue);
+                _titleNewGame.gameObject.SetActive(true);
+                var label = _titleNewGame.GetComponentInChildren<TextMeshProUGUI>(true);
+                if (label != null)
+                {
+                    label.text = "처음 시작하기";
+                    UiTypography.Apply(label, bold: true);
+                }
             }
 
             if (_titleProgressLabel != null)
@@ -120,7 +132,7 @@ namespace ShadowGarden.Presentation
 
             if (main.CurrentState == AppState.Title)
             {
-                SelectButton(_titleContinue);
+                SelectButton(canContinue ? _titleContinue : _titleNewGame);
             }
         }
 
@@ -226,7 +238,7 @@ namespace ShadowGarden.Presentation
             else if (state == AppState.Ending)
             {
                 EnsureEnding(router?.EndingRoot);
-                SelectButton(_endingWorldMap);
+                BeginEndingBeat();
             }
         }
 
@@ -251,6 +263,11 @@ namespace ShadowGarden.Presentation
 
             TickOpeningHold();
             TickGameOverResetShortcut();
+            if (main != null && main.CurrentState != AppState.Ending && _endingBeatRoutine != null)
+            {
+                StopCoroutine(_endingBeatRoutine);
+                _endingBeatRoutine = null;
+            }
         }
 
         private void TickGameOverResetShortcut()
@@ -281,10 +298,8 @@ namespace ShadowGarden.Presentation
                 return;
             }
 
-            var keyboard = UnityEngine.InputSystem.Keyboard.current;
-            var holding =
-                _openingHoldActive ||
-                (keyboard != null && (keyboard.spaceKey.isPressed || keyboard.enterKey.isPressed));
+            // Skip is hold-on-Skip-button only. Enter/Space are reserved for 「다음」 via Submit.
+            var holding = _openingHoldActive;
 
             if (!holding)
             {
@@ -308,15 +323,32 @@ namespace ShadowGarden.Presentation
 
         private void UpdateOpeningHoldGauge(float progress)
         {
-            if (_openingHoldFill == null)
+            var normalized = Mathf.Clamp01(progress);
+            if (_openingHoldFill != null)
             {
-                return;
+                _openingHoldFill.gameObject.SetActive(true);
+                var rect = _openingHoldFill.rectTransform;
+                var trackWidth = _openingHoldTrack != null
+                    ? Mathf.Max(1f, _openingHoldTrack.rectTransform.sizeDelta.x)
+                    : 320f;
+                rect.anchorMin = new Vector2(0f, 0.5f);
+                rect.anchorMax = new Vector2(0f, 0.5f);
+                rect.pivot = new Vector2(0f, 0.5f);
+                rect.anchoredPosition = new Vector2(0f, 0f);
+                rect.sizeDelta = new Vector2(Mathf.Max(2f, trackWidth * Mathf.Max(0.02f, normalized)), 10f);
+                _openingHoldFill.color = Color.Lerp(
+                    new Color(UiTheme.Mint.r, UiTheme.Mint.g, UiTheme.Mint.b, 0.35f),
+                    UiTheme.Mint,
+                    normalized);
             }
 
-            var normalized = Mathf.Clamp01(progress);
-            _openingHoldFill.gameObject.SetActive(normalized > 0.001f);
-            var rect = _openingHoldFill.rectTransform;
-            rect.sizeDelta = new Vector2(Mathf.Max(1f, 320f * normalized), 10f);
+            if (_openingHoldHint != null)
+            {
+                _openingHoldHint.text = normalized > 0.02f
+                    ? $"홀드하여 건너뛰기  {Mathf.RoundToInt(normalized * 100f)}%"
+                    : "홀드하여 건너뛰기";
+                UiTypography.Apply(_openingHoldHint, bold: false);
+            }
         }
 
         private void OnNavigate(Vector2 value)
@@ -391,7 +423,8 @@ namespace ShadowGarden.Presentation
                     ActivateSelectedOrDefault(_titleContinue);
                     break;
                 case AppState.Opening:
-                    ActivateSelectedOrDefault(_openingContinue);
+                    // Always advance/complete — do not activate Skip (empty click / hold-only).
+                    AdvanceOpeningOrComplete();
                     break;
                 case AppState.WorldMap:
                     ActivateSelectedOrDefault(FocusedWorldMapButton());
@@ -466,6 +499,10 @@ namespace ShadowGarden.Presentation
             }
 
             EnsureOpening(router.OpeningRoot);
+            // Re-bind after layout/ensure so 「다음」 never loses its click handler.
+            SetClick(_openingContinue, AdvanceOpeningOrComplete);
+            SetClick(_openingSkip, () => { });
+            ConfigureOpeningHoldEvents(_openingSkip);
             _openingPage = 0;
             _openingHoldSeconds = 0f;
             _openingHoldActive = false;
@@ -476,6 +513,11 @@ namespace ShadowGarden.Presentation
 
         private void AdvanceOpeningOrComplete()
         {
+            if (main == null || main.CurrentState != AppState.Opening)
+            {
+                return;
+            }
+
             if (_openingPage < OpeningPages.Length - 1)
             {
                 _openingPage++;
@@ -484,7 +526,7 @@ namespace ShadowGarden.Presentation
                 return;
             }
 
-            main?.CompleteOpening();
+            main.CompleteOpening();
         }
 
         private void ApplyOpeningPage()
@@ -532,19 +574,23 @@ namespace ShadowGarden.Presentation
             }
 
             SetRootLabel(root, "그림자 정원");
-            _titleConceptLabel = EnsureLabel(root.transform, "ConceptLabel",
-                "빛과 그림자로 잠든 정원을 되살린다", new Vector2(0f, 100f), 22f);
-            _titleContinue = EnsureButton(root.transform, "ContinueButton", "정원 들어가기", new Vector2(0f, 20f));
-            _titleNewGame = EnsureButton(root.transform, "NewGameButton", "새로 선택", new Vector2(0f, -50f));
+            _titleContinue = EnsureButton(root.transform, "ContinueButton", "정원으로 돌아가기", new Vector2(0f, 20f));
+            _titleNewGame = EnsureButton(root.transform, "NewGameButton", "처음 시작하기", new Vector2(0f, -50f));
             _titleReplayOpening = EnsureButton(root.transform, "ReplayOpeningButton", "오프닝 다시 보기",
                 new Vector2(0f, -120f));
             _titleSettings = EnsureButton(root.transform, "SettingsButton", "설정", new Vector2(0f, -190f));
             _titleProgressLabel = EnsureLabel(root.transform, "ProgressLabel", string.Empty, new Vector2(0f, -260f), 20f);
-            // Remove legacy StartButton if present.
-            var legacy = FindDescendant(root.transform, "StartButton");
-            if (legacy != null)
+            // Remove legacy StartButton / concept line if present.
+            var legacyStart = FindDescendant(root.transform, "StartButton");
+            if (legacyStart != null)
             {
-                legacy.gameObject.SetActive(false);
+                legacyStart.gameObject.SetActive(false);
+            }
+
+            var legacyConcept = FindDescendant(root.transform, "ConceptLabel");
+            if (legacyConcept != null)
+            {
+                legacyConcept.gameObject.SetActive(false);
             }
         }
 
@@ -569,20 +615,76 @@ namespace ShadowGarden.Presentation
                 skipRt.sizeDelta = new Vector2(360f, Mathf.Max(56f, UiTheme.ButtonMinHeight));
             }
 
-            if (_openingHoldFill == null)
+            EnsureOpeningHoldGauge(root.transform);
+        }
+
+        private void EnsureOpeningHoldGauge(Transform root)
+        {
+            var gaugeTransform = FindDescendant(root, "SkipHoldGauge");
+            RectTransform gaugeRt;
+            if (gaugeTransform == null)
             {
-                var gauge = new GameObject("SkipHoldGauge", typeof(RectTransform), typeof(Image));
-                gauge.transform.SetParent(root.transform, false);
-                var grt = gauge.GetComponent<RectTransform>();
-                grt.anchorMin = grt.anchorMax = new Vector2(0.5f, 0.5f);
-                grt.sizeDelta = new Vector2(320f, 10f);
-                grt.anchoredPosition = new Vector2(0f, -270f);
-                _openingHoldFill = gauge.GetComponent<Image>();
-                _openingHoldFill.color = UiTheme.Mint;
-                _openingHoldFill.type = Image.Type.Simple;
-                _openingHoldFill.raycastTarget = false;
-                _openingHoldFill.gameObject.SetActive(false);
+                var gauge = new GameObject("SkipHoldGauge", typeof(RectTransform));
+                gauge.transform.SetParent(root, false);
+                gaugeRt = gauge.GetComponent<RectTransform>();
             }
+            else
+            {
+                gaugeRt = gaugeTransform as RectTransform ?? gaugeTransform.gameObject.AddComponent<RectTransform>();
+                // Legacy single-image gauge: convert to track/fill/hint hierarchy.
+                var legacyImage = gaugeRt.GetComponent<Image>();
+                if (legacyImage != null && gaugeRt.Find("Track") == null)
+                {
+                    Object.Destroy(legacyImage);
+                }
+            }
+
+            gaugeRt.anchorMin = gaugeRt.anchorMax = new Vector2(0.5f, 0.5f);
+            gaugeRt.pivot = new Vector2(0.5f, 0.5f);
+            gaugeRt.sizeDelta = new Vector2(360f, 48f);
+            gaugeRt.anchoredPosition = new Vector2(0f, -270f);
+
+            var trackTransform = gaugeRt.Find("Track");
+            if (trackTransform == null)
+            {
+                var trackGo = new GameObject("Track", typeof(RectTransform), typeof(Image));
+                trackGo.transform.SetParent(gaugeRt, false);
+                trackTransform = trackGo.transform;
+            }
+
+            _openingHoldTrack = trackTransform.GetComponent<Image>() ?? trackTransform.gameObject.AddComponent<Image>();
+            var trackRt = _openingHoldTrack.rectTransform;
+            trackRt.anchorMin = new Vector2(0.5f, 0.5f);
+            trackRt.anchorMax = new Vector2(0.5f, 0.5f);
+            trackRt.pivot = new Vector2(0.5f, 0.5f);
+            trackRt.sizeDelta = new Vector2(320f, 12f);
+            trackRt.anchoredPosition = new Vector2(0f, 8f);
+            _openingHoldTrack.color = new Color(UiTheme.NavyDeep.r, UiTheme.NavyDeep.g, UiTheme.NavyDeep.b, 0.22f);
+            _openingHoldTrack.raycastTarget = false;
+
+            var fillTransform = gaugeRt.Find("Fill");
+            if (fillTransform == null)
+            {
+                var fillGo = new GameObject("Fill", typeof(RectTransform), typeof(Image));
+                fillGo.transform.SetParent(trackTransform, false);
+                fillTransform = fillGo.transform;
+            }
+
+            _openingHoldFill = fillTransform.GetComponent<Image>() ?? fillTransform.gameObject.AddComponent<Image>();
+            var fillRt = _openingHoldFill.rectTransform;
+            fillRt.anchorMin = new Vector2(0f, 0.5f);
+            fillRt.anchorMax = new Vector2(0f, 0.5f);
+            fillRt.pivot = new Vector2(0f, 0.5f);
+            fillRt.sizeDelta = new Vector2(2f, 10f);
+            fillRt.anchoredPosition = Vector2.zero;
+            _openingHoldFill.color = UiTheme.Mint;
+            _openingHoldFill.raycastTarget = false;
+
+            _openingHoldHint = EnsureLabel(gaugeRt, "HoldHintLabel", "홀드하여 건너뛰기",
+                new Vector2(0f, -14f), 16f);
+            _openingHoldHint.rectTransform.sizeDelta = new Vector2(360f, 28f);
+            _openingHoldHint.alignment = TextAlignmentOptions.Center;
+            UiTypography.Apply(_openingHoldHint, bold: false);
         }
 
         private void ConfigureOpeningHoldEvents(Button button)
@@ -699,23 +801,221 @@ namespace ShadowGarden.Presentation
             }
 
             SetRootLabel(root, "엔딩");
-            var body = EnsureLabel(
+            _endingBody = EnsureLabel(
                 root.transform,
                 "EndingBody",
                 "세 정원이 다시 숨을 쉬기 시작했습니다.",
                 new Vector2(0f, 40f),
                 24f);
-            body.gameObject.SetActive(true);
-            body.rectTransform.sizeDelta = new Vector2(720f, 80f);
-            _endingCredits = EnsureLabel(
-                root.transform,
-                "CreditsLabel",
-                "제작 정보\nShadow Garden\nFont · Noto Sans KR (SIL OFL 1.1)\nCore · Runtime · Presentation · Infrastructure",
-                new Vector2(0f, -40f),
-                18f);
-            _endingCredits.rectTransform.sizeDelta = new Vector2(720f, 100f);
+            _endingBody.gameObject.SetActive(true);
+            _endingBody.rectTransform.sizeDelta = new Vector2(720f, 80f);
+            var legacyCredits = FindDescendant(root.transform, "CreditsLabel");
+            if (legacyCredits != null)
+            {
+                legacyCredits.gameObject.SetActive(false);
+            }
+
             _endingWorldMap = EnsureButton(root.transform, "WorldMapButton", "레벨 선택", new Vector2(0f, -140f));
             _endingTitle = EnsureButton(root.transform, "TitleButton", "타이틀", new Vector2(0f, -210f));
+        }
+
+        private void BeginEndingBeat()
+        {
+            if (_endingBeatRoutine != null)
+            {
+                StopCoroutine(_endingBeatRoutine);
+                _endingBeatRoutine = null;
+            }
+
+            _endingBeatComplete = false;
+            SetEndingCtaInteractable(false);
+            _endingBeatRoutine = StartCoroutine(EndingBeatRoutine());
+        }
+
+        private IEnumerator EndingBeatRoutine()
+        {
+            // OnStateChanged applies screen art after RefreshModalForState; wait one frame.
+            yield return null;
+            var root = router?.EndingRoot;
+            if (root == null || main == null || main.CurrentState != AppState.Ending)
+            {
+                FinishEndingBeatUi();
+                yield break;
+            }
+
+            var worldA = FindDescendant(root.transform, "EndingWorldA")?.GetComponent<Image>();
+            var worldB = FindDescendant(root.transform, "EndingWorldB")?.GetComponent<Image>();
+            var flower = FindDescendant(root.transform, "EndingFlower")?.GetComponent<Image>();
+            var moa = FindDescendant(root.transform, "EndingMoa")?.GetComponent<Image>();
+            var vfx = FindDescendant(root.transform, "EndingVfx")?.GetComponent<Image>();
+
+            var worlds = new[]
+            {
+                PresentationAssetLibrary.ForStage("1-1"),
+                PresentationAssetLibrary.ForStage("2-1"),
+                PresentationAssetLibrary.ForStage("3-1")
+            };
+
+            if (_endingBody != null)
+            {
+                _endingBody.text = "멈췄던 정원이 하나둘 숨을 고릅니다.";
+                UiTypography.Apply(_endingBody, bold: false);
+            }
+
+            var recoverSeconds = PresentationTiming.EndingWorldRecoverSeconds;
+            var celebrateSeconds = PresentationTiming.EndingCelebrateSeconds;
+            var reduceMotion = main?.Save?.Preferences != null && main.Save.Preferences.reduceMotion;
+            if (reduceMotion)
+            {
+                recoverSeconds = 2.4f;
+                celebrateSeconds = 1.6f;
+            }
+
+            var perWorld = recoverSeconds / 3f;
+            for (var i = 0; i < 3; i++)
+            {
+                var art = worlds[i];
+                if (worldA != null && art?.background != null)
+                {
+                    if (i == 0)
+                    {
+                        worldA.sprite = art.background;
+                        worldA.color = Color.white;
+                        if (worldB != null) worldB.color = new Color(1f, 1f, 1f, 0f);
+                    }
+                    else if (worldB != null)
+                    {
+                        worldB.sprite = art.background;
+                        yield return CrossfadeImages(worldA, worldB, Mathf.Max(0.35f, perWorld * 0.45f));
+                        worldA.sprite = art.background;
+                        worldA.color = Color.white;
+                        worldB.color = new Color(1f, 1f, 1f, 0f);
+                    }
+                }
+
+                if (flower != null)
+                {
+                    flower.sprite = art?.flowerBloom ?? flower.sprite;
+                    yield return FadeImage(flower, 0f, 1f, Mathf.Max(0.25f, perWorld * 0.35f));
+                    if (i < 2)
+                    {
+                        yield return FadeImage(flower, 1f, 0.25f, Mathf.Max(0.15f, perWorld * 0.2f));
+                    }
+                }
+                else
+                {
+                    yield return new WaitForSecondsRealtime(perWorld);
+                }
+            }
+
+            if (moa != null)
+            {
+                moa.sprite = PresentationAssetLibrary.Catalog?.moa?.celebrateQuietly ??
+                             PresentationAssetLibrary.Catalog?.moa?.relieved ??
+                             moa.sprite;
+            }
+
+            if (_endingBody != null)
+            {
+                _endingBody.text = "세 정원이 다시 숨을 쉬기 시작했습니다.";
+                UiTypography.Apply(_endingBody, bold: false);
+            }
+
+            var celebrateElapsed = 0f;
+            while (celebrateElapsed < celebrateSeconds)
+            {
+                celebrateElapsed += Time.unscaledDeltaTime;
+                var t = Mathf.Clamp01(celebrateElapsed / celebrateSeconds);
+                if (vfx != null)
+                {
+                    var pulse = 0.35f + 0.45f * Mathf.Sin(t * Mathf.PI);
+                    vfx.sprite = PresentationAssetLibrary.Catalog?.gameplayFx?.completionGlow ??
+                                 PresentationAssetLibrary.Catalog?.gameplayFx?.flowerPetal ??
+                                 vfx.sprite;
+                    vfx.color = new Color(1f, 1f, 1f, pulse);
+                }
+
+                if (flower != null)
+                {
+                    flower.color = Color.Lerp(flower.color, Color.white, Time.unscaledDeltaTime * 2f);
+                }
+
+                yield return null;
+            }
+
+            if (vfx != null)
+            {
+                yield return FadeImage(vfx, vfx.color.a, 0.55f, 0.35f);
+            }
+
+            FinishEndingBeatUi();
+            _endingBeatRoutine = null;
+        }
+
+        private void FinishEndingBeatUi()
+        {
+            _endingBeatComplete = true;
+            SetEndingCtaInteractable(true);
+            SelectButton(_endingWorldMap);
+        }
+
+        private void SetEndingCtaInteractable(bool enabled)
+        {
+            if (_endingWorldMap != null)
+            {
+                _endingWorldMap.interactable = enabled;
+                _endingWorldMap.gameObject.SetActive(true);
+            }
+
+            if (_endingTitle != null)
+            {
+                _endingTitle.interactable = enabled;
+                _endingTitle.gameObject.SetActive(true);
+            }
+        }
+
+        private static IEnumerator CrossfadeImages(Image from, Image to, float duration)
+        {
+            if (from == null || to == null)
+            {
+                yield break;
+            }
+
+            var elapsed = 0f;
+            to.color = new Color(1f, 1f, 1f, 0f);
+            while (elapsed < duration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                var t = Mathf.Clamp01(elapsed / duration);
+                from.color = new Color(1f, 1f, 1f, 1f - t);
+                to.color = new Color(1f, 1f, 1f, t);
+                yield return null;
+            }
+
+            from.color = new Color(1f, 1f, 1f, 0f);
+            to.color = Color.white;
+        }
+
+        private static IEnumerator FadeImage(Image image, float fromAlpha, float toAlpha, float duration)
+        {
+            if (image == null)
+            {
+                yield break;
+            }
+
+            var elapsed = 0f;
+            var color = image.color;
+            while (elapsed < duration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                var t = Mathf.Clamp01(elapsed / duration);
+                color.a = Mathf.Lerp(fromAlpha, toAlpha, t);
+                image.color = color;
+                yield return null;
+            }
+
+            color.a = toAlpha;
+            image.color = color;
         }
 
         private void RebuildWorldCards()
@@ -995,7 +1295,9 @@ namespace ShadowGarden.Presentation
         private void CycleTitleFocus(int delta)
         {
             var buttons = new List<Button>();
-            if (_titleContinue != null && _titleContinue.gameObject.activeInHierarchy)
+            if (_titleContinue != null &&
+                _titleContinue.gameObject.activeInHierarchy &&
+                _titleContinue.interactable)
             {
                 buttons.Add(_titleContinue);
             }

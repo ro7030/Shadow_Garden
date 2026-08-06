@@ -115,7 +115,8 @@ namespace ShadowGarden.Presentation
             Vector2 anchored,
             UnityAction onClick,
             float width = UiTheme.ButtonWidth,
-            float height = UiTheme.ButtonMinHeight)
+            float height = UiTheme.ButtonMinHeight,
+            bool forceSecondary = false)
         {
             height = Mathf.Max(height, UiTheme.ButtonMinHeight);
             var existing = parent.Find(name);
@@ -162,23 +163,16 @@ namespace ShadowGarden.Presentation
             }
 
             var catalog = PresentationAssetLibrary.Catalog;
-            var secondary = IsSecondaryAction(name);
+            var secondary = forceSecondary || IsSecondaryAction(name);
             image.sprite = secondary ? catalog?.buttonSecondary : catalog?.buttonPrimary;
             image.type = image.sprite != null ? Image.Type.Sliced : Image.Type.Simple;
-            image.color = image.sprite != null ? Color.white : UiTheme.Navy;
+            image.color = image.sprite != null ? Color.white : (secondary ? UiTheme.Ivory : UiTheme.Navy);
             var labelTmp = EnsureButtonLabel(button.transform, label);
             labelTmp.fontSize = UiTheme.ButtonFont;
             labelTmp.color = secondary ? UiTheme.NavyDeep : UiTheme.Ivory;
             UiTypography.Apply(labelTmp, bold: true);
 
-            button.transition = Selectable.Transition.ColorTint;
-            var colors = button.colors;
-            colors.normalColor = Color.white;
-            colors.highlightedColor = new Color(1.08f, 1.08f, 1.08f, 1f);
-            colors.pressedColor = new Color(0.9f, 0.9f, 0.9f, 1f);
-            colors.selectedColor = new Color(1.05f, 1.05f, 1.05f, 1f);
-            colors.disabledColor = new Color(0.55f, 0.55f, 0.58f, 0.7f);
-            button.colors = colors;
+            ApplyButtonColorTint(button, secondary);
 
             if (onClick != null)
             {
@@ -192,6 +186,37 @@ namespace ShadowGarden.Presentation
             button.gameObject.SetActive(true);
             EnsureFocusFrame(button.transform, catalog?.buttonFocus);
             return button;
+        }
+
+        /// <summary>
+        /// ColorTint multiplies the graphic color. White/secondary sprites clamp above 1,
+        /// so highlight/selected must darken or mint-tint instead of brightening.
+        /// </summary>
+        public static void ApplyButtonColorTint(Button button, bool secondary)
+        {
+            if (button == null)
+            {
+                return;
+            }
+
+            button.transition = Selectable.Transition.ColorTint;
+            var colors = button.colors;
+            colors.normalColor = Color.white;
+            if (secondary)
+            {
+                colors.highlightedColor = new Color(0.82f, 0.96f, 0.90f, 1f);
+                colors.selectedColor = new Color(0.74f, 0.93f, 0.86f, 1f);
+                colors.pressedColor = new Color(0.72f, 0.84f, 0.80f, 1f);
+            }
+            else
+            {
+                colors.highlightedColor = new Color(1.08f, 1.08f, 1.08f, 1f);
+                colors.selectedColor = new Color(1.05f, 1.05f, 1.05f, 1f);
+                colors.pressedColor = new Color(0.9f, 0.9f, 0.9f, 1f);
+            }
+
+            colors.disabledColor = new Color(0.55f, 0.55f, 0.58f, 0.7f);
+            button.colors = colors;
         }
 
         public static void SetButtonInteractable(Button button, bool interactable)
@@ -275,7 +300,7 @@ namespace ShadowGarden.Presentation
         {
             return name.Contains("Settings") || name.Contains("Replay") || name.Contains("NewGame") ||
                    name.Contains("LevelSelect") || name.Contains("WorldMap") || name.Contains("Back") ||
-                   name.Contains("Credits") || name.Contains("Cancel");
+                   name.Contains("Credits") || name.Contains("Cancel") || name.Contains("Title");
         }
 
         private static void EnsureFocusFrame(Transform button, Sprite sprite)

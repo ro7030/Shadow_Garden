@@ -55,6 +55,96 @@ namespace ShadowGarden.Tests.EditMode
         }
 
         [Test]
+        public void Frozen_Runtime_Inventory_Has_Expected_Counts()
+        {
+            var artRoot = Path.Combine(Application.dataPath, "Game", "Art");
+            var runtimePngs = Directory.EnumerateFiles(
+                    Path.Combine(artRoot, "Common"), "*.png", SearchOption.AllDirectories)
+                .Concat(Directory.EnumerateFiles(
+                    Path.Combine(artRoot, "Worlds"), "*.png", SearchOption.AllDirectories))
+                .ToArray();
+            var audio = Directory.EnumerateFiles(
+                Path.Combine(Application.dataPath, "Game", "Audio"), "*.wav", SearchOption.AllDirectories).ToArray();
+            var atlases = Directory.EnumerateFiles(
+                Path.Combine(Application.dataPath, "Game", "Atlases"), "*.spriteatlas", SearchOption.TopDirectoryOnly).ToArray();
+            var bindings = Directory.EnumerateFiles(
+                Path.Combine(Application.dataPath, "Resources", "Presentation", "Bindings"),
+                "*.asset",
+                SearchOption.TopDirectoryOnly).ToArray();
+
+            Assert.AreEqual(106, runtimePngs.Length, "Frozen runtime PNG inventory changed.");
+            Assert.AreEqual(22, audio.Length, "Frozen runtime WAV inventory changed.");
+            var audioMp3 = Directory.EnumerateFiles(
+                Path.Combine(Application.dataPath, "Game", "Audio"), "*.mp3", SearchOption.AllDirectories).ToArray();
+            Assert.AreEqual(4, audioMp3.Length, "Runtime replacement BGM mp3 inventory changed.");
+            Assert.AreEqual(6, atlases.Length, "Frozen Sprite Atlas inventory changed.");
+            Assert.AreEqual(12, bindings.Length, "Frozen stage presentation binding inventory changed.");
+        }
+
+        [Test]
+        public void Frozen_Catalog_Moa_Fx_Audio_And_World_References_Are_Complete()
+        {
+            var catalog = PresentationAssetLibrary.Catalog;
+            Assert.IsNotNull(catalog);
+            AssertAllNotNull("Catalog sprites", new Object[]
+            {
+                catalog.lampBody, catalog.lampArrow,
+                catalog.pillarLow, catalog.pillarMedium, catalog.pillarHigh,
+                catalog.channelCircle, catalog.channelTriangle, catalog.channelStar, catalog.channelDiamond,
+                catalog.panel, catalog.panelLight, catalog.buttonPrimary, catalog.buttonSecondary,
+                catalog.buttonFocus, catalog.worldCardFrame, catalog.keyCap,
+                catalog.iconPause, catalog.iconDoor, catalog.iconFlower, catalog.iconRetry,
+                catalog.iconWorldMap, catalog.iconLock, catalog.iconCheck, catalog.iconDanger
+            });
+
+            var moa = catalog.moa;
+            Assert.IsNotNull(moa);
+            AssertAllNotNull("Moa sprites", new Object[]
+            {
+                moa.frontA, moa.frontB, moa.backA, moa.backB, moa.sideA, moa.sideB,
+                moa.neutral, moa.curious, moa.surprised, moa.worried, moa.determined, moa.relieved,
+                moa.holdSeed, moa.adjustCloak, moa.observe, moa.rotateLamp, moa.stepForward,
+                moa.celebrateQuietly
+            });
+
+            var fx = catalog.gameplayFx;
+            Assert.IsNotNull(fx);
+            AssertAllNotNull("Gameplay FX", new Object[]
+            {
+                fx.singleShadow, fx.overlapHazard, fx.cliffRim, fx.rotateSweep, fx.dangerPulse,
+                fx.doorGlow, fx.flowerPetal, fx.fallDust, fx.vacuumSwirl, fx.completionGlow
+            });
+
+            var audio = catalog.audio;
+            Assert.IsNotNull(audio);
+            AssertAllNotNull("Audio clips", new Object[]
+            {
+                audio.commonMotif, audio.orchardLayer, audio.canyonLayer, audio.greenhouseLayer,
+                audio.orchardAmbience, audio.canyonAmbience, audio.greenhouseAmbience,
+                audio.move, audio.rotate, audio.shadowCell, audio.warning30, audio.warning10,
+                audio.blocked, audio.overlapDeath, audio.cliffDeath, audio.timeDeath,
+                audio.doorOpen, audio.doorPass, audio.flowerBloom, audio.complete,
+                audio.uiMove, audio.uiSubmit
+            });
+
+            for (var world = 1; world <= 3; world++)
+            {
+                var art = PresentationAssetLibrary.ForStage($"{world}-1");
+                Assert.IsNotNull(art, $"W0{world}");
+                AssertAllNotNull($"W0{world} sprites", new Object[]
+                {
+                    art.background, art.boardFrame, art.boardVoid, art.safeTile, art.safeTileVariant,
+                    art.safeTileFlora, art.safeTileFeature, art.cliffTile, art.environmentReaction,
+                    art.doorClosed, art.doorOpen, art.flowerClosed, art.flowerBloom, art.ambienceLoop
+                });
+                Assert.AreEqual(3, art.backDecor?.Length ?? 0, $"W0{world} back decor count");
+                Assert.AreEqual(3, art.frontDecor?.Length ?? 0, $"W0{world} front decor count");
+                AssertAllNotNull($"W0{world} back decor", art.backDecor.Cast<Object>());
+                AssertAllNotNull($"W0{world} front decor", art.frontDecor.Cast<Object>());
+            }
+        }
+
+        [Test]
         public void Pillar_Family_Has_Equal_Diameters_And_Clear_Height_Steps()
         {
             var catalog = PresentationAssetLibrary.Catalog;
@@ -108,6 +198,41 @@ namespace ShadowGarden.Tests.EditMode
                 Assert.AreEqual(path.Contains("/UI/") ? 100f : 128f, importer.spritePixelsPerUnit, 0.01f, path);
                 Assert.AreEqual(FilterMode.Bilinear, importer.filterMode, path);
                 Assert.IsFalse(importer.mipmapEnabled, path);
+                Assert.AreEqual(TextureWrapMode.Clamp, importer.wrapMode, path);
+                Assert.AreEqual(TextureImporterCompression.Compressed, importer.textureCompression, path);
+
+                var settings = new TextureImporterSettings();
+                importer.ReadTextureSettings(settings);
+                var usesBottomPivot = path.Contains("/Moa/") || path.Contains("/Gameplay/") ||
+                                      path.Contains("/Goals/") || path.Contains("/Decor/");
+                var expectedPivot = usesBottomPivot ? new Vector2(0.5f, 0.06f) : new Vector2(0.5f, 0.5f);
+                Assert.AreEqual(expectedPivot.x, settings.spritePivot.x, 0.001f, path);
+                Assert.AreEqual(expectedPivot.y, settings.spritePivot.y, 0.001f, path);
+            }
+        }
+
+        [Test]
+        public void Runtime_Audio_Follows_WebGl_Import_Contract()
+        {
+            var guids = AssetDatabase.FindAssets("t:AudioClip", new[] { "Assets/Game/Audio" });
+            Assert.AreEqual(26, guids.Length);
+            foreach (var guid in guids)
+            {
+                var path = AssetDatabase.GUIDToAssetPath(guid);
+                var importer = AssetImporter.GetAtPath(path) as AudioImporter;
+                Assert.IsNotNull(importer, path);
+                var settings = importer.defaultSampleSettings;
+                var longForm = path.Contains("/Music/") || path.Contains("/Ambience/");
+                Assert.AreEqual(
+                    longForm ? AudioClipLoadType.CompressedInMemory : AudioClipLoadType.DecompressOnLoad,
+                    settings.loadType,
+                    path);
+                Assert.AreEqual(
+                    longForm ? AudioCompressionFormat.Vorbis : AudioCompressionFormat.PCM,
+                    settings.compressionFormat,
+                    path);
+                Assert.AreEqual(longForm, importer.loadInBackground, path);
+                Assert.IsTrue(settings.preloadAudioData, path);
             }
         }
 
@@ -225,6 +350,16 @@ namespace ShadowGarden.Tests.EditMode
             Assert.IsNotNull(module.move);
             Assert.IsNotNull(module.submit);
             Assert.IsNotNull(module.leftClick);
+        }
+
+        private static void AssertAllNotNull(string label, System.Collections.Generic.IEnumerable<Object> assets)
+        {
+            var array = assets?.ToArray() ?? System.Array.Empty<Object>();
+            Assert.Greater(array.Length, 0, label);
+            for (var index = 0; index < array.Length; index++)
+            {
+                Assert.IsNotNull(array[index], $"{label}[{index}]");
+            }
         }
     }
 }

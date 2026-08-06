@@ -81,7 +81,12 @@ namespace ShadowGarden.Presentation
             var buttons = EnsureButtonGroup(panel.transform, "ButtonGroup", new Vector2(360f, 300f), new Vector2(0f, -45f));
 
             MoveInto(root.transform, "TitleLabel", "Label", header, new Vector2(0f, 280f), new Vector2(540f, 92f), 64f);
-            MoveInto(root.transform, "ConceptLabel", null, content, new Vector2(0f, 195f), new Vector2(540f, 70f), 24f);
+            var concept = FindDescendant(root.transform, "ConceptLabel");
+            if (concept != null)
+            {
+                concept.gameObject.SetActive(false);
+            }
+
             MoveInto(root.transform, "ProgressLabel", null, content, new Vector2(0f, -245f), new Vector2(520f, 52f), 18f);
             ArrangeButtons(root.transform, buttons, "ContinueButton", "NewGameButton", "ReplayOpeningButton", "SettingsButton");
             panel.transform.SetAsLastSibling();
@@ -105,7 +110,7 @@ namespace ShadowGarden.Presentation
             MoveInto(root.transform, "TitleLabel", "Label", header, new Vector2(0f, 285f), new Vector2(720f, 70f), 44f);
             MoveInto(root.transform, "OpeningPageLabel", null, content, new Vector2(0f, 205f), new Vector2(640f, 40f), 18f);
             MoveInto(root.transform, "OpeningBody", null, content, new Vector2(0f, 65f), new Vector2(720f, 220f), 24f);
-            MoveInto(root.transform, "SkipHoldGauge", null, content, new Vector2(0f, -305f), new Vector2(320f, 10f), null);
+            MoveInto(root.transform, "SkipHoldGauge", null, content, new Vector2(0f, -305f), new Vector2(360f, 52f), null);
             ArrangeButtons(root.transform, buttons, "ContinueButton", "SkipButton");
             panel.transform.SetAsLastSibling();
         }
@@ -124,10 +129,28 @@ namespace ShadowGarden.Presentation
             var root = _router?.EndingRoot;
             if (root == null) return;
 
+            var beatLayer = EnsureFullLayer(root.transform, "EndingBeatLayer", 1);
+            var worldA = EnsureImage(beatLayer, "EndingWorldA", PresentationAssetLibrary.ForStage("1-1")?.background,
+                Vector2.zero, Vector2.zero);
+            Stretch(worldA.rectTransform);
+            worldA.preserveAspect = false;
+            var worldB = EnsureImage(beatLayer, "EndingWorldB", PresentationAssetLibrary.ForStage("2-1")?.background,
+                Vector2.zero, Vector2.zero);
+            Stretch(worldB.rectTransform);
+            worldB.color = new Color(1f, 1f, 1f, 0f);
+            var flower = EnsureImage(beatLayer, "EndingFlower", PresentationAssetLibrary.ForStage("1-1")?.flowerBloom,
+                new Vector2(220f, 220f), new Vector2(-420f, -40f));
+            flower.preserveAspect = true;
+            flower.color = new Color(1f, 1f, 1f, 0f);
+
             var artLayer = EnsureFullLayer(root.transform, "CharacterArtLayer", 2);
-            var portrait = EnsureImage(artLayer, "EndingMoa", PresentationAssetLibrary.Catalog?.moa?.celebrateQuietly,
+            var portrait = EnsureImage(artLayer, "EndingMoa", PresentationAssetLibrary.Catalog?.moa?.relieved,
                 new Vector2(410f, 500f), new Vector2(470f, -105f));
             portrait.preserveAspect = true;
+            var vfx = EnsureImage(artLayer, "EndingVfx", PresentationAssetLibrary.Catalog?.gameplayFx?.completionGlow,
+                new Vector2(520f, 520f), new Vector2(470f, -40f));
+            vfx.preserveAspect = true;
+            vfx.color = new Color(1f, 1f, 1f, 0f);
 
             var panel = EnsurePanel(root.transform, "EndingNotePanel", new Vector2(850f, 760f), new Vector2(-230f, 0f));
             var header = EnsureFullLayer(panel.transform, "HeaderRoot", 0);
@@ -136,7 +159,12 @@ namespace ShadowGarden.Presentation
 
             MoveInto(root.transform, "TitleLabel", "Label", header, new Vector2(0f, 285f), new Vector2(700f, 70f), 48f);
             MoveInto(root.transform, "EndingBody", null, content, new Vector2(0f, 155f), new Vector2(700f, 90f), 24f);
-            MoveInto(root.transform, "CreditsLabel", null, content, new Vector2(0f, 35f), new Vector2(700f, 150f), 18f);
+            var credits = FindDescendant(root.transform, "CreditsLabel");
+            if (credits != null)
+            {
+                credits.gameObject.SetActive(false);
+            }
+
             ArrangeButtons(root.transform, buttons, "WorldMapButton", "TitleButton");
             panel.transform.SetAsLastSibling();
         }

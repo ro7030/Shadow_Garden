@@ -2,6 +2,7 @@ using System.Collections;
 using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
+using ShadowGarden.Infrastructure;
 using ShadowGarden.Presentation;
 using ShadowGarden.Runtime;
 using TMPro;
@@ -55,11 +56,13 @@ namespace ShadowGarden.Tests.PlayMode
             Assert.IsNotNull(screens);
 
             root.Save.Preferences.openingSeen = true;
+            root.Save.RecordStageCleared("1-1", 9000);
             screens.RefreshTitleBranch();
             yield return null;
 
             var continueButton = GameObject.Find("ContinueButton")?.GetComponent<Button>();
             Assert.IsNotNull(continueButton);
+            Assert.IsTrue(continueButton.interactable);
             continueButton.onClick.Invoke();
             yield return null;
 
@@ -67,18 +70,30 @@ namespace ShadowGarden.Tests.PlayMode
         }
 
         [UnityTest]
-        public IEnumerator Pause_Opens_From_Screen_Button_Without_Esc()
+        public IEnumerator Pause_Opens_From_Screen_Button_And_Esc_Toggle()
         {
             yield return LoadMain();
             var root = Object.FindFirstObjectByType<MainCompositionRoot>();
             root.Save.Preferences.openingSeen = true;
+            root.Save.RecordStageCleared("1-1", 9000);
             root.ContinueFromTitle();
             yield return null;
             root.StartStage("1-1");
             yield return null;
             yield return null;
             Assert.AreEqual(AppState.Playing, root.CurrentState);
+
             root.OpenPause();
+            yield return null;
+            Assert.IsTrue(root.Overlay.IsPauseOpen);
+            Assert.IsTrue(root.IsPlayPaused);
+
+            root.TogglePauseFromInput();
+            yield return null;
+            Assert.IsFalse(root.Overlay.IsPauseOpen);
+            Assert.IsFalse(root.IsPlayPaused);
+
+            root.TogglePauseFromInput();
             yield return null;
             Assert.IsTrue(root.Overlay.IsPauseOpen);
             Assert.IsTrue(root.IsPlayPaused);
@@ -90,6 +105,7 @@ namespace ShadowGarden.Tests.PlayMode
             yield return LoadMain();
             var root = Object.FindFirstObjectByType<MainCompositionRoot>();
             root.Save.Preferences.openingSeen = true;
+            root.Save.RecordStageCleared("1-1", 9000);
             root.ContinueFromTitle();
             yield return null;
             root.StartStage("1-1");
@@ -110,6 +126,7 @@ namespace ShadowGarden.Tests.PlayMode
             var root = Object.FindFirstObjectByType<MainCompositionRoot>();
             var screens = Object.FindFirstObjectByType<MainFlowScreens>();
             root.Save.Preferences.openingSeen = true;
+            root.Save.RecordStageCleared("1-1", 9000);
             root.ContinueFromTitle();
             yield return null;
             root.StartStage("1-1");
@@ -142,6 +159,7 @@ namespace ShadowGarden.Tests.PlayMode
             var root = Object.FindFirstObjectByType<MainCompositionRoot>();
             Assert.IsNotNull(root);
             root.Save.Preferences.openingSeen = true;
+            root.Save.RecordStageCleared("1-1", 9000);
             root.ContinueFromTitle();
             yield return null;
             root.StartStage("1-1");
@@ -178,6 +196,7 @@ namespace ShadowGarden.Tests.PlayMode
             yield return LoadMain();
             var root = Object.FindFirstObjectByType<MainCompositionRoot>();
             root.Save.Preferences.openingSeen = true;
+            root.Save.RecordStageCleared("1-1", 9000);
             root.ContinueFromTitle();
             yield return null;
             root.StartStage("1-1");
@@ -246,6 +265,7 @@ namespace ShadowGarden.Tests.PlayMode
             yield return LoadMain();
             var root = Object.FindFirstObjectByType<MainCompositionRoot>();
             root.Save.Preferences.openingSeen = true;
+            root.Save.RecordStageCleared("1-1", 9000);
             root.ContinueFromTitle();
             yield return null;
             root.StartStage("1-1");
@@ -273,7 +293,18 @@ namespace ShadowGarden.Tests.PlayMode
             yield return LoadMain();
             var root = Object.FindFirstObjectByType<MainCompositionRoot>();
             root.Save.Preferences.openingSeen = false;
-            Assert.IsTrue(root.RequestState(AppState.Opening).Accepted);
+            if (root.CurrentState != AppState.Opening)
+            {
+                if (root.CurrentState == AppState.Title)
+                {
+                    Assert.IsTrue(root.RequestState(AppState.Opening).Accepted);
+                }
+                else if (root.CurrentState == AppState.WorldMap)
+                {
+                    Assert.IsTrue(root.RequestState(AppState.Opening).Accepted);
+                }
+            }
+
             yield return null;
             yield return null;
 
@@ -283,6 +314,178 @@ namespace ShadowGarden.Tests.PlayMode
             AssertInside(panel, GameObject.Find("OpeningBody")?.GetComponent<RectTransform>());
             AssertInside(panel, GameObject.Find("ContinueButton")?.GetComponent<RectTransform>());
             AssertInside(panel, GameObject.Find("SkipButton")?.GetComponent<RectTransform>());
+            AssertInside(panel, GameObject.Find("SkipHoldGauge")?.GetComponent<RectTransform>());
+            Assert.IsNotNull(GameObject.Find("HoldHintLabel"));
+            Assert.IsNotNull(GameObject.Find("Track"));
+            Assert.IsNotNull(GameObject.Find("Fill"));
+        }
+
+        [UnityTest]
+        public IEnumerator First_Boot_Without_OpeningSeen_Enters_Title()
+        {
+            PlayerPrefs.DeleteKey(PlayerPrefsSaveRepository.UiPrefsKey);
+            PlayerPrefs.DeleteKey(PlayerPrefsSaveRepository.ProgressKey);
+            PlayerPrefs.Save();
+            yield return LoadMain();
+            var root = Object.FindFirstObjectByType<MainCompositionRoot>();
+            Assert.IsNotNull(root);
+            Assert.AreEqual(AppState.Title, root.CurrentState);
+            Assert.IsFalse(root.Save.Preferences.openingSeen);
+            Assert.IsFalse(root.Save.CanContinue());
+        }
+
+        [UnityTest]
+        public IEnumerator Opening_Complete_Marks_Seen_And_Goes_WorldMap()
+        {
+            yield return LoadMain();
+            var root = Object.FindFirstObjectByType<MainCompositionRoot>();
+            root.Save.Preferences.openingSeen = false;
+            if (root.CurrentState != AppState.Opening)
+            {
+                if (root.CurrentState == AppState.Title)
+                {
+                    Assert.IsTrue(root.RequestState(AppState.Opening).Accepted);
+                }
+                else
+                {
+                    Assert.IsTrue(root.RequestState(AppState.WorldMap).Accepted);
+                    Assert.IsTrue(root.RequestState(AppState.Opening).Accepted);
+                }
+            }
+
+            yield return null;
+            root.CompleteOpening();
+            yield return null;
+            Assert.IsTrue(root.Save.Preferences.openingSeen);
+            Assert.AreEqual(AppState.WorldMap, root.CurrentState);
+        }
+
+        [UnityTest]
+        public IEnumerator Opening_Next_Button_Advances_Page_Manually()
+        {
+            yield return LoadMain();
+            var root = Object.FindFirstObjectByType<MainCompositionRoot>();
+            var screens = Object.FindFirstObjectByType<MainFlowScreens>();
+            if (root.CurrentState != AppState.Opening)
+            {
+                Assert.IsTrue(root.RequestState(AppState.Opening).Accepted);
+            }
+
+            yield return null;
+            Assert.AreEqual(AppState.Opening, root.CurrentState);
+
+            var pageField = typeof(MainFlowScreens).GetField("_openingPage",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.IsNotNull(pageField);
+            Assert.AreEqual(0, (int)pageField.GetValue(screens));
+
+            var continueButton = GameObject.Find("ContinueButton")?.GetComponent<Button>();
+            Assert.IsNotNull(continueButton);
+            continueButton.onClick.Invoke();
+            yield return null;
+            Assert.AreEqual(1, (int)pageField.GetValue(screens));
+            Assert.AreEqual(AppState.Opening, root.CurrentState);
+        }
+
+        [UnityTest]
+        public IEnumerator ReplayOpening_Does_Not_Clear_Progress_Or_OpeningSeen()
+        {
+            yield return LoadMain();
+            var root = Object.FindFirstObjectByType<MainCompositionRoot>();
+            root.Save.Preferences.openingSeen = true;
+            root.Save.RecordStageCleared("1-1", 12000);
+            root.Save.RecordStageCleared("1-2", 15000);
+            var beforeBest = root.Save.Progress.ToBestClearDictionary()["1-1"];
+            var beforeCount = root.Save.Progress.completedStageIds.Count;
+
+            if (root.CurrentState == AppState.Opening)
+            {
+                root.CompleteOpening();
+                yield return null;
+            }
+
+            root.ReplayOpening();
+            yield return null;
+            Assert.AreEqual(AppState.Opening, root.CurrentState);
+            Assert.IsTrue(root.Save.Preferences.openingSeen);
+            Assert.AreEqual(beforeCount, root.Save.Progress.completedStageIds.Count);
+            Assert.AreEqual(beforeBest, root.Save.Progress.ToBestClearDictionary()["1-1"]);
+
+            root.CompleteOpening();
+            yield return null;
+            Assert.AreEqual(AppState.Title, root.CurrentState);
+            Assert.AreEqual(beforeCount, root.Save.Progress.completedStageIds.Count);
+        }
+
+        [UnityTest]
+        public IEnumerator Ending_Beat_Enables_Cta_Then_Title_And_WorldMap_Work()
+        {
+            yield return LoadMain();
+            var root = Object.FindFirstObjectByType<MainCompositionRoot>();
+            var screens = Object.FindFirstObjectByType<MainFlowScreens>();
+            root.Save.Preferences.reduceMotion = true;
+            root.Save.Preferences.openingSeen = true;
+            if (root.CurrentState == AppState.Opening)
+            {
+                root.CompleteOpening();
+                yield return null;
+            }
+            else if (root.CurrentState == AppState.Title)
+            {
+                Assert.IsTrue(root.RequestState(AppState.WorldMap).Accepted);
+            }
+
+            Assert.AreEqual(AppState.WorldMap, root.CurrentState);
+            Assert.IsTrue(root.RequestState(AppState.Playing).Accepted);
+            Assert.IsTrue(root.RequestState(AppState.Cleared).Accepted);
+            Assert.IsTrue(root.RequestState(AppState.Ending).Accepted);
+            yield return null;
+
+            var timeout = 8f;
+            while (!screens.IsEndingBeatComplete && timeout > 0f)
+            {
+                timeout -= Time.unscaledDeltaTime;
+                yield return null;
+            }
+
+            Assert.IsTrue(screens.IsEndingBeatComplete);
+            var worldMap = GameObject.Find("WorldMapButton")?.GetComponent<Button>();
+            var title = GameObject.Find("TitleButton")?.GetComponent<Button>();
+            Assert.IsNotNull(worldMap);
+            Assert.IsNotNull(title);
+            Assert.IsTrue(worldMap.interactable);
+            Assert.IsTrue(title.interactable);
+
+            title.onClick.Invoke();
+            yield return null;
+            Assert.AreEqual(AppState.Title, root.CurrentState);
+
+            Assert.IsTrue(root.RequestState(AppState.WorldMap).Accepted);
+            Assert.IsTrue(root.RequestState(AppState.Playing).Accepted);
+            Assert.IsTrue(root.RequestState(AppState.Cleared).Accepted);
+            Assert.IsTrue(root.RequestState(AppState.Ending).Accepted);
+            timeout = 8f;
+            while (!screens.IsEndingBeatComplete && timeout > 0f)
+            {
+                timeout -= Time.unscaledDeltaTime;
+                yield return null;
+            }
+
+            worldMap = GameObject.Find("WorldMapButton")?.GetComponent<Button>();
+            Assert.IsNotNull(worldMap);
+            worldMap.onClick.Invoke();
+            yield return null;
+            Assert.AreEqual(AppState.WorldMap, root.CurrentState);
+
+            Assert.IsTrue(root.RequestState(AppState.Playing).Accepted);
+            Assert.IsTrue(root.RequestState(AppState.Cleared).Accepted);
+            Assert.IsTrue(root.RequestState(AppState.Ending).Accepted);
+            yield return null;
+            yield return null;
+            Assert.AreEqual(1, Object.FindObjectsByType<Transform>(FindObjectsInactive.Include, FindObjectsSortMode.None)
+                .Count(t => t.name == "EndingNotePanel"));
+            Assert.AreEqual(1, Object.FindObjectsByType<Transform>(FindObjectsInactive.Include, FindObjectsSortMode.None)
+                .Count(t => t.name == "EndingBeatLayer"));
         }
 
         [UnityTest]
@@ -300,7 +503,8 @@ namespace ShadowGarden.Tests.PlayMode
 
             var panel = GameObject.Find("TitleNotePanel")?.GetComponent<RectTransform>();
             Assert.IsNotNull(panel);
-            AssertInside(panel, GameObject.Find("ConceptLabel")?.GetComponent<RectTransform>());
+            var concept = GameObject.Find("ConceptLabel");
+            Assert.IsTrue(concept == null || !concept.activeInHierarchy);
             AssertInside(panel, GameObject.Find("ContinueButton")?.GetComponent<RectTransform>());
             AssertInside(panel, GameObject.Find("ReplayOpeningButton")?.GetComponent<RectTransform>());
             AssertInside(panel, GameObject.Find("SettingsButton")?.GetComponent<RectTransform>());
@@ -312,6 +516,7 @@ namespace ShadowGarden.Tests.PlayMode
             yield return LoadMain();
             var root = Object.FindFirstObjectByType<MainCompositionRoot>();
             root.Save.Preferences.openingSeen = true;
+            root.Save.RecordStageCleared("1-1", 9000);
             root.ContinueFromTitle();
             yield return null;
 
@@ -371,6 +576,8 @@ namespace ShadowGarden.Tests.PlayMode
 
             root.CompleteOpening();
             yield return null;
+            Assert.AreEqual(AppState.Title, root.CurrentState);
+            Assert.IsTrue(root.RequestState(AppState.WorldMap).Accepted);
             root.StartStage("1-1");
             yield return null;
             root.NotifyGameOver(ShadowGarden.Core.GameOverCause.CliffFall);
@@ -384,6 +591,7 @@ namespace ShadowGarden.Tests.PlayMode
             yield return LoadMain();
             var root = Object.FindFirstObjectByType<MainCompositionRoot>();
             root.Save.Preferences.openingSeen = true;
+            root.Save.RecordStageCleared("1-1", 9000);
             root.ContinueFromTitle();
             yield return null;
             yield return null;
@@ -438,6 +646,41 @@ namespace ShadowGarden.Tests.PlayMode
         }
 
         [UnityTest]
+        public IEnumerator Capture_Asset_Freeze_Stage_Matrix()
+        {
+            yield return LoadMain();
+            var root = Object.FindFirstObjectByType<MainCompositionRoot>();
+            Assert.IsNotNull(root);
+            root.Save.Preferences.openingSeen = true;
+            root.Save.RecordStageCleared("1-1", 9000);
+            root.ContinueFromTitle();
+            yield return null;
+
+            var highResolutionStages = new[] { "1-1", "1-4", "2-2", "2-4", "3-1", "3-4" };
+            for (var world = 1; world <= 3; world++)
+            for (var stage = 1; stage <= 4; stage++)
+            {
+                var id = $"{world}-{stage}";
+                Screen.SetResolution(1280, 720, FullScreenMode.Windowed);
+                root.StartStage(id);
+                yield return null;
+                yield return null;
+                Assert.AreEqual(id, root.Gameplay.Definition.StageId);
+                yield return Capture($"Freeze_Stage_{id}_1280x720");
+
+                if (highResolutionStages.Contains(id))
+                {
+                    Screen.SetResolution(1920, 1080, FullScreenMode.Windowed);
+                    yield return null;
+                    yield return Capture($"Freeze_Stage_{id}_1920x1080");
+                }
+
+                root.ReturnToWorldMap();
+                yield return null;
+            }
+        }
+
+        [UnityTest]
         public IEnumerator Title_Has_Replay_Opening_Button()
         {
             yield return LoadMain();
@@ -450,6 +693,7 @@ namespace ShadowGarden.Tests.PlayMode
             yield return LoadMain();
             var root = Object.FindFirstObjectByType<MainCompositionRoot>();
             root.Save.Preferences.openingSeen = true;
+            root.Save.RecordStageCleared("1-1", 9000);
             root.ContinueFromTitle();
             yield return null;
             root.StartStage("1-3");
@@ -482,7 +726,7 @@ namespace ShadowGarden.Tests.PlayMode
         }
 
         [UnityTest]
-        public IEnumerator Title_Uses_Garden_Enter_Copy()
+        public IEnumerator Title_Uses_Continue_And_Start_Copy()
         {
             yield return LoadMain();
             var root = Object.FindFirstObjectByType<MainCompositionRoot>();
@@ -491,11 +735,99 @@ namespace ShadowGarden.Tests.PlayMode
             var screens = Object.FindFirstObjectByType<MainFlowScreens>();
             screens.RefreshTitleBranch();
             yield return null;
-            var continueBtn = GameObject.Find("ContinueButton");
+
+            var continueBtn = GameObject.Find("ContinueButton")?.GetComponent<Button>();
             Assert.IsNotNull(continueBtn);
-            var label = continueBtn.GetComponentInChildren<TextMeshProUGUI>(true);
-            Assert.IsNotNull(label);
-            StringAssert.Contains("정원 들어가기", label.text);
+            Assert.IsFalse(continueBtn.interactable);
+            var continueLabel = continueBtn.GetComponentInChildren<TextMeshProUGUI>(true);
+            Assert.IsNotNull(continueLabel);
+            StringAssert.Contains("정원으로 돌아가기", continueLabel.text);
+
+            var newGameBtn = GameObject.Find("NewGameButton");
+            Assert.IsNotNull(newGameBtn);
+            Assert.IsTrue(newGameBtn.activeInHierarchy);
+            var newGameLabel = newGameBtn.GetComponentInChildren<TextMeshProUGUI>(true);
+            Assert.IsNotNull(newGameLabel);
+            StringAssert.Contains("처음 시작하기", newGameLabel.text);
+        }
+
+        [UnityTest]
+        public IEnumerator StartNewGame_Plays_Opening_Then_WorldMap()
+        {
+            yield return LoadMain();
+            var root = Object.FindFirstObjectByType<MainCompositionRoot>();
+            root.Save.ResetProgressForNewGame();
+            root.StartNewGameFromTitle();
+            yield return null;
+            Assert.AreEqual(AppState.Opening, root.CurrentState);
+
+            root.CompleteOpening();
+            yield return null;
+            Assert.IsTrue(root.Save.Preferences.openingSeen);
+            Assert.AreEqual(AppState.WorldMap, root.CurrentState);
+        }
+
+        [UnityTest]
+        public IEnumerator Pause_Has_Title_Return_Between_WorldMap_And_Settings()
+        {
+            yield return LoadMain();
+            var root = Object.FindFirstObjectByType<MainCompositionRoot>();
+            root.Save.Preferences.openingSeen = true;
+            root.Save.RecordStageCleared("1-1", 9000);
+            root.ContinueFromTitle();
+            yield return null;
+            root.StartStage("1-1");
+            yield return null;
+            root.OpenPause();
+            yield return null;
+
+            var pause = GameObject.Find("PausePanel");
+            Assert.IsNotNull(pause);
+            Assert.IsNotNull(pause.transform.Find("WorldMapButton"));
+            Assert.IsNotNull(pause.transform.Find("TitleButton"));
+            Assert.IsNotNull(pause.transform.Find("SettingsButton"));
+            var titleY = pause.transform.Find("TitleButton").GetComponent<RectTransform>().anchoredPosition.y;
+            var mapY = pause.transform.Find("WorldMapButton").GetComponent<RectTransform>().anchoredPosition.y;
+            var settingsY = pause.transform.Find("SettingsButton").GetComponent<RectTransform>().anchoredPosition.y;
+            Assert.Less(titleY, mapY);
+            Assert.Greater(titleY, settingsY);
+
+            root.Overlay.OpenSettings(AppState.Playing);
+            yield return null;
+            var settingsReplay = GameObject.Find("SettingsPanel")?.transform.Find("ReplayOpeningButton");
+            Assert.IsTrue(settingsReplay == null || !settingsReplay.gameObject.activeSelf);
+        }
+
+        [UnityTest]
+        public IEnumerator Pause_Keyboard_Nav_Includes_WorldMap_Button()
+        {
+            yield return LoadMain();
+            var root = Object.FindFirstObjectByType<MainCompositionRoot>();
+            root.Save.Preferences.openingSeen = true;
+            root.Save.RecordStageCleared("1-1", 9000);
+            root.ContinueFromTitle();
+            yield return null;
+            root.StartStage("1-1");
+            yield return null;
+            root.OpenPause();
+            yield return null;
+
+            var pause = GameObject.Find("PausePanel");
+            var retry = pause.transform.Find("RetryButton")?.GetComponent<Button>();
+            var worldMap = pause.transform.Find("WorldMapButton")?.GetComponent<Button>();
+            Assert.IsNotNull(retry);
+            Assert.IsNotNull(worldMap);
+            Assert.AreEqual(Navigation.Mode.Explicit, worldMap.navigation.mode);
+            Assert.AreSame(worldMap, retry.navigation.selectOnDown);
+            Assert.AreSame(retry, worldMap.navigation.selectOnUp);
+
+            EventSystem.current.SetSelectedGameObject(retry.gameObject);
+            yield return null;
+            var down = worldMap; // explicit target
+            EventSystem.current.SetSelectedGameObject(down.gameObject);
+            yield return null;
+            Assert.AreEqual("WorldMapButton", EventSystem.current.currentSelectedGameObject?.name);
+            Assert.IsTrue(worldMap.GetComponent<UiFocusOutline>() != null);
         }
 
         [UnityTest]
@@ -504,6 +836,7 @@ namespace ShadowGarden.Tests.PlayMode
             yield return LoadMain();
             var root = Object.FindFirstObjectByType<MainCompositionRoot>();
             root.Save.Preferences.openingSeen = true;
+            root.Save.RecordStageCleared("1-1", 9000);
             root.ContinueFromTitle();
             yield return null;
             root.StartStage("1-1");
@@ -526,6 +859,7 @@ namespace ShadowGarden.Tests.PlayMode
             yield return LoadMain();
             var root = Object.FindFirstObjectByType<MainCompositionRoot>();
             root.Save.Preferences.openingSeen = true;
+            root.Save.RecordStageCleared("1-1", 9000);
             root.ContinueFromTitle();
             yield return null;
             root.StartStage("1-1");
@@ -544,6 +878,7 @@ namespace ShadowGarden.Tests.PlayMode
             yield return LoadMain();
             var root = Object.FindFirstObjectByType<MainCompositionRoot>();
             root.Save.Preferences.openingSeen = true;
+            root.Save.RecordStageCleared("1-1", 9000);
             root.ContinueFromTitle();
             yield return null;
             root.StartStage("1-1");
@@ -559,9 +894,17 @@ namespace ShadowGarden.Tests.PlayMode
             Assert.AreEqual(stagePanel.anchoredPosition.y, goalPanel.anchoredPosition.y, 0.1f);
             Assert.AreEqual(stagePanel.anchoredPosition.x, -goalPanel.anchoredPosition.x, 0.1f);
 
-            AssertInside(stagePanel, GameObject.Find("StageLabel")?.GetComponent<RectTransform>());
-            AssertInside(goalPanel, GameObject.Find("GoalLabel")?.GetComponent<RectTransform>());
+            var stageLabel = GameObject.Find("StageLabel")?.GetComponent<TextMeshProUGUI>();
+            var goalLabel = GameObject.Find("GoalLabel")?.GetComponent<TextMeshProUGUI>();
+            AssertInside(stagePanel, stageLabel?.rectTransform);
+            AssertInside(goalPanel, goalLabel?.rectTransform);
             AssertInside(goalPanel, GameObject.Find("PauseButton")?.GetComponent<RectTransform>());
+            Assert.AreEqual(0.5f, stageLabel.rectTransform.anchorMin.x, 0.01f);
+            Assert.AreEqual(0f, stageLabel.rectTransform.anchoredPosition.x, 0.1f);
+            Assert.AreEqual(TextAlignmentOptions.Center, stageLabel.alignment);
+            Assert.AreEqual(0.5f, goalLabel.rectTransform.anchorMin.x, 0.01f);
+            Assert.AreEqual(0f, goalLabel.rectTransform.anchoredPosition.x, 0.1f);
+            Assert.AreEqual(TextAlignmentOptions.Center, goalLabel.alignment);
         }
 
         private static IEnumerator Capture(string name)

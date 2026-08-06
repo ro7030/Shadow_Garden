@@ -18,5 +18,7 @@ namespace ShadowGarden.Presentation
         public const float OpeningSkipHoldSeconds = 1f;
         public const float WorldUnlockBeatSeconds = 1.2f;
         public const float EndingBeatSeconds = 10f;
+        public const float EndingWorldRecoverSeconds = 6f;
+        public const float EndingCelebrateSeconds = 4f;
     }
 }

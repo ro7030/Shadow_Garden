@@ -35,7 +35,17 @@ namespace ShadowGarden.Presentation
 
         public void OnDeselect(BaseEventData eventData) => Set(false);
 
-        public void OnPointerEnter(PointerEventData eventData) => Gameplay?.PlayUiMove();
+        public void OnPointerEnter(PointerEventData eventData)
+        {
+            // Keep keyboard/gamepad selection in sync with hover so ColorTint selected + outline show.
+            if (EventSystem.current != null &&
+                EventSystem.current.currentSelectedGameObject != gameObject)
+            {
+                EventSystem.current.SetSelectedGameObject(gameObject);
+            }
+
+            Gameplay?.PlayUiMove();
+        }
 
         public void OnPointerClick(PointerEventData eventData) => Gameplay?.PlayUiSubmit();
 

@@ -229,10 +229,10 @@ namespace ShadowGarden.Presentation.Editor
 
         private static void AssignAudio(AudioSetAsset asset)
         {
-            asset.commonMotif = Audio("Assets/Game/Audio/Music/BGM_CommonMotif.wav");
-            asset.orchardLayer = Audio("Assets/Game/Audio/Music/BGM_OrchardLayer.wav");
-            asset.canyonLayer = Audio("Assets/Game/Audio/Music/BGM_CanyonLayer.wav");
-            asset.greenhouseLayer = Audio("Assets/Game/Audio/Music/BGM_GreenhouseLayer.wav");
+            asset.commonMotif = Audio("Assets/Game/Audio/Music/BGM_Lobby_GardenMap.mp3");
+            asset.orchardLayer = Audio("Assets/Game/Audio/Music/BGM_W01_SunsetOrchard.mp3");
+            asset.canyonLayer = Audio("Assets/Game/Audio/Music/BGM_W02_WindChimeCanyon.mp3");
+            asset.greenhouseLayer = Audio("Assets/Game/Audio/Music/BGM_W03_StarrootGreenhouse.mp3");
             asset.orchardAmbience = Audio("Assets/Game/Audio/Ambience/AMB_Orchard.wav");
             asset.canyonAmbience = Audio("Assets/Game/Audio/Ambience/AMB_Canyon.wav");
             asset.greenhouseAmbience = Audio("Assets/Game/Audio/Ambience/AMB_Greenhouse.wav");

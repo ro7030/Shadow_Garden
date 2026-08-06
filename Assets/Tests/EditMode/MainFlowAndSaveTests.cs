@@ -13,6 +13,15 @@ namespace ShadowGarden.Tests.EditMode
     public class AppStateMachineTests
     {
         [Test]
+        public void Opening_Can_Return_To_Title()
+        {
+            var flow = new GameFlowController(AppState.Title);
+            Assert.IsTrue(flow.TryTransition(AppState.Opening).Accepted);
+            Assert.IsTrue(flow.TryTransition(AppState.Title).Accepted);
+            Assert.AreEqual(AppState.Title, flow.Current);
+        }
+
+        [Test]
         public void Allowed_Transitions_Are_Accepted()
         {
             var flow = new GameFlowController(AppState.Title);
@@ -239,6 +248,31 @@ namespace ShadowGarden.Tests.EditMode
             var ui = asset.FindActionMap("UI", true);
             Assert.IsNotNull(ui.FindAction("Point"));
             Assert.IsNotNull(ui.FindAction("Click"));
+        }
+
+        [Test]
+        public void Pause_Action_Remains_Available_While_Gameplay_Soft_Disabled()
+        {
+            var asset = AssetDatabaseLoadActions();
+            var router = new InputRouter(asset);
+            try
+            {
+                router.ApplyForAppState(AppState.Playing);
+                router.EnableGameplay(false);
+                Assert.AreEqual(InputMapMode.Gameplay, router.ActiveMode);
+
+                var pauseField = typeof(InputRouter).GetField("_pause",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                Assert.IsNotNull(pauseField);
+                var pause = (UnityEngine.InputSystem.InputAction)pauseField.GetValue(router);
+                Assert.IsNotNull(pause);
+                Assert.IsTrue(pause.enabled, "Esc pause must stay enabled while move input is soft-disabled");
+                Assert.IsFalse(asset.FindActionMap("Gameplay").enabled);
+            }
+            finally
+            {
+                router.Dispose();
+            }
         }
 
         private static InputActionAsset AssetDatabaseLoadActions()

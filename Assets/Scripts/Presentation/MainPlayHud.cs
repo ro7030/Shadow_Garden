@@ -64,15 +64,15 @@ namespace ShadowGarden.Presentation
             _progressPanel = CreateAnchoredPanel("ProgressPanel", new Vector2(1f, 0f),
                 new Vector2(-UiTheme.SafeMargin, UiTheme.SafeMargin), new Vector2(430f, 76f), new Vector2(1f, 0f));
 
-            stageLabel = CreateAnchorLabel(_stagePanel.transform, "StageLabel", new Vector2(0f, 0.5f),
-                new Vector2(22f, 0f), new Vector2(455f, 52f),
-                TextAlignmentOptions.MidlineLeft, UiTheme.HudFont, true);
+            stageLabel = CreateAnchorLabel(_stagePanel.transform, "StageLabel", new Vector2(0.5f, 0.5f),
+                Vector2.zero, new Vector2(455f, 52f),
+                TextAlignmentOptions.Center, UiTheme.HudFont, true);
             timerLabel = CreateAnchorLabel(root.transform, "TimerLabel", new Vector2(0.5f, 1f),
                 new Vector2(0f, -UiTheme.SafeMargin - 12f), new Vector2(210f, 52f),
                 TextAlignmentOptions.Top, UiTheme.TimerFont, true);
-            goalLabel = CreateAnchorLabel(_goalPanel.transform, "GoalLabel", new Vector2(1f, 0.5f),
-                new Vector2(-78f, 0f), new Vector2(330f, 52f),
-                TextAlignmentOptions.MidlineRight, UiTheme.SubtitleFont, true);
+            goalLabel = CreateAnchorLabel(_goalPanel.transform, "GoalLabel", new Vector2(0.5f, 0.5f),
+                Vector2.zero, new Vector2(330f, 52f),
+                TextAlignmentOptions.Center, UiTheme.SubtitleFont, true);
             progressLabel = CreateAnchorLabel(root.transform, "ProgressLabel", new Vector2(1f, 0f),
                 new Vector2(-UiTheme.SafeMargin - 22f, UiTheme.SafeMargin + 14f), new Vector2(202f, 48f),
                 TextAlignmentOptions.BottomRight, UiTheme.BodyFontMin + 1, false);
@@ -104,6 +104,10 @@ namespace ShadowGarden.Presentation
             pauseRt.anchorMin = pauseRt.anchorMax = new Vector2(1f, 0.5f);
             pauseRt.pivot = new Vector2(1f, 0.5f);
             pauseRt.anchoredPosition = new Vector2(-10f, 0f);
+            // Click-only — must not participate in pause-menu keyboard navigation.
+            var pauseNav = pauseButton.navigation;
+            pauseNav.mode = Navigation.Mode.None;
+            pauseButton.navigation = pauseNav;
             UiFactory.EnsureIcon(pauseButton.transform, "PauseIcon", skin?.iconPause, new Vector2(24f, 24f));
             WirePause();
         }

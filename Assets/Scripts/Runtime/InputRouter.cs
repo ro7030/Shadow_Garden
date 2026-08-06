@@ -25,6 +25,7 @@ namespace ShadowGarden.Runtime
         private readonly InputAction _submit;
         private readonly InputAction _point;
         private readonly InputAction _click;
+        private readonly InputAction _pause;
 
         public event Action<CardinalDirection> MoveRequested;
         public event Action<int> RotateRequested;
@@ -32,9 +33,11 @@ namespace ShadowGarden.Runtime
         public event Action<Vector2> NavigateRequested;
         public event Action SubmitRequested;
         public event Action ClickRequested;
+        public event Action PauseRequested;
 
         private bool _gameplayEnabled = true;
         private bool _inputLocked;
+        private bool _pauseAvailableInUi;
         private float _lockRemaining;
         private CardinalDirection? _bufferedMove;
         private int? _bufferedRotate;
@@ -56,6 +59,8 @@ namespace ShadowGarden.Runtime
             _submit = _ui.FindAction("Submit", true);
             _point = _ui.FindAction("Point", true);
             _click = _ui.FindAction("Click", true);
+            // Standalone so Esc still works while gameplay map is soft-disabled during pause.
+            _pause = new InputAction("Pause", InputActionType.Button, "<Keyboard>/escape");
 
             _move.performed += OnMove;
             _rotateLeft.performed += OnRotateLeft;
@@ -64,10 +69,12 @@ namespace ShadowGarden.Runtime
             _navigate.performed += OnNavigate;
             _submit.performed += OnSubmit;
             _click.performed += OnClick;
+            _pause.performed += OnPause;
         }
 
         /// <summary>
         /// Exactly one map may be active. Gameplay and UI never enable together.
+        /// Pause (Esc) stays available whenever gameplay mode is active, even if move input is soft-disabled.
         /// </summary>
         public void SetMapMode(InputMapMode mode)
         {
@@ -105,6 +112,8 @@ namespace ShadowGarden.Runtime
                     ClearBuffer();
                     break;
             }
+
+            RefreshPauseAction();
         }
 
         public void ApplyForAppState(AppState state)
@@ -130,6 +139,7 @@ namespace ShadowGarden.Runtime
             {
                 _gameplay.Disable();
                 _ui.Disable();
+                _pause.Disable();
                 ClearBuffer();
             }
             else
@@ -150,6 +160,15 @@ namespace ShadowGarden.Runtime
             {
                 ClearBuffer();
             }
+        }
+
+        /// <summary>
+        /// When true, Esc pause remains available while the UI map is active (pause/settings overlays).
+        /// </summary>
+        public void SetPauseAvailableInUi(bool available)
+        {
+            _pauseAvailableInUi = available;
+            RefreshPauseAction();
         }
 
         public void LockForSeconds(float seconds)
@@ -188,6 +207,25 @@ namespace ShadowGarden.Runtime
             _navigate.performed -= OnNavigate;
             _submit.performed -= OnSubmit;
             _click.performed -= OnClick;
+            _pause.performed -= OnPause;
+            _pause.Disable();
+            _pause.Dispose();
+        }
+
+        private void RefreshPauseAction()
+        {
+            var allow =
+                !_inputLocked &&
+                (_mode == InputMapMode.Gameplay ||
+                 (_mode == InputMapMode.Ui && _pauseAvailableInUi));
+            if (allow)
+            {
+                _pause.Enable();
+            }
+            else
+            {
+                _pause.Disable();
+            }
         }
 
         private void OnMove(InputAction.CallbackContext context)
@@ -291,6 +329,22 @@ namespace ShadowGarden.Runtime
             }
 
             ClickRequested?.Invoke();
+        }
+
+        private void OnPause(InputAction.CallbackContext context)
+        {
+            if (_inputLocked)
+            {
+                return;
+            }
+
+            if (_mode != InputMapMode.Gameplay &&
+                !(_mode == InputMapMode.Ui && _pauseAvailableInUi))
+            {
+                return;
+            }
+
+            PauseRequested?.Invoke();
         }
 
         private void FlushBuffer()
