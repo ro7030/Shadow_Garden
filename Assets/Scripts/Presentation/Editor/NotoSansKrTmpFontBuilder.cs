@@ -277,7 +277,7 @@ namespace ShadowGarden.Presentation.EditorTools
             // Exact UI phrases (Stage 1–4). Deduped below so every displayed syllable is baked.
             string[] phrases =
             {
-                "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
+                "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789%",
                 " ·×/!:?.,-'\"[]()↑↓←→",
                 "그림자 정원", "시작", "계속", "월드 맵", "게임 오버", "완료",
                 "정원 들어가기", "새로 선택", "처음 시작하기", "홀드하여 건너뛰기",

@@ -334,6 +334,16 @@ namespace ShadowGarden.Tests.EditMode
         }
 
         [Test]
+        public void Opening_Hold_Progress_Percent_Glyph_Exists_In_Runtime_Font_Chain()
+        {
+            var fonts = new[] { UiTypography.Regular, UiTypography.Bold, UiTypography.Symbols, UiTypography.Ornaments }
+                .Where(font => font != null)
+                .Distinct()
+                .ToArray();
+            Assert.IsTrue(fonts.Any(font => font.HasCharacter('%')), "Missing TMP glyph U+0025 used by HoldHintLabel");
+        }
+
+        [Test]
         public void Main_Scene_EventSystem_Has_Resolvable_Ui_Input_Actions()
         {
             var scene = UnityEditor.SceneManagement.EditorSceneManager.OpenScene(

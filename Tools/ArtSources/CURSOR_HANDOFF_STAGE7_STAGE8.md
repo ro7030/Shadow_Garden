@@ -8,10 +8,10 @@
 이번 작업은 《그림자 정원》의 오프닝·엔딩·WebGL 외곽 셸을 제출 가능한 상태로 완성하는 7단계 작업이다.
 
 프로젝트:
- /Users/dong-geun/Desktop/Unity_Project/Shadow_Garden
+ <프로젝트_루트>
 
 기획서:
- /Users/dong-geun/Desktop/그림자 정원 기획서
+ <기획서_폴더>
 
 먼저 반드시 읽을 자료:
 - 그림자_정원_컨셉 기획서.docx
@@ -94,7 +94,7 @@ Development WebGL 후보를 Builds/WebGL-Stage7-Candidate에 생성하라.
 이번 작업은 《그림자 정원》의 기능을 추가하지 않고 제출용 WebGL Release가 안정될 때까지 검증하고 수정하는 최종 8단계다.
 
 프로젝트:
- /Users/dong-geun/Desktop/Unity_Project/Shadow_Garden
+ <프로젝트_루트>
 
 기준:
 - Unity 6000.3.11f1
@@ -171,4 +171,3 @@ Development WebGL 후보를 Builds/WebGL-Stage7-Candidate에 생성하라.
 
 첫 Release 생성만으로 종료하지 말고, 발견된 오류를 수정한 뒤 전체 회귀를 재실행하라.
 ```
-

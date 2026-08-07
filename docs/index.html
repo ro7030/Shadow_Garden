@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>그림자 정원 | Shadow_Garden</title>
+    <link rel="shortcut icon" href="TemplateData/favicon.ico">
+    <link rel="stylesheet" href="TemplateData/style.css">
+  </head>
+  <body>
+    <div id="sg-shell">
+      <header id="sg-header">
+        <h1 id="sg-title">그림자 정원</h1>
+        <p id="sg-subtitle">Shadow Garden</p>
+      </header>
+
+      <div id="sg-mobile-gate" hidden>
+        <p>이 작품은 데스크톱 가로 화면(Chrome · Safari)에서 플레이해 주세요.</p>
+        <p class="sg-hint">모바일·세로 모드는 지원하지 않습니다.</p>
+      </div>
+
+      <div id="unity-container" class="unity-desktop">
+        <canvas id="unity-canvas" width=960 height=600 tabindex="-1"></canvas>
+        <div id="unity-loading-bar">
+          <div id="unity-logo"></div>
+          <div id="sg-loading-copy">불러오는 중… <span id="sg-progress-text">0%</span></div>
+          <div id="unity-progress-bar-empty">
+            <div id="unity-progress-bar-full"></div>
+          </div>
+        </div>
+        <div id="unity-warning"> </div>
+        <div id="sg-start-overlay" hidden>
+          <button id="sg-play-start" type="button">플레이 시작</button>
+          <p class="sg-hint">클릭하면 화면 포커스와 사운드가 활성화됩니다.</p>
+        </div>
+        <div id="sg-error-panel" hidden>
+          <p id="sg-error-message">불러오기에 실패했습니다.</p>
+          <button id="sg-reload" type="button">다시 불러오기</button>
+          <p class="sg-hint">권장 브라우저: Chrome · macOS Safari</p>
+        </div>
+        <div id="unity-footer">
+          <div id="unity-logo-title-footer"></div>
+          <div id="unity-fullscreen-button"></div>
+          <div id="unity-build-title">Shadow_Garden</div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      var canvas = document.querySelector("#unity-canvas");
+      var container = document.querySelector("#unity-container");
+      var startOverlay = document.querySelector("#sg-start-overlay");
+      var playStart = document.querySelector("#sg-play-start");
+      var errorPanel = document.querySelector("#sg-error-panel");
+      var errorMessage = document.querySelector("#sg-error-message");
+      var mobileGate = document.querySelector("#sg-mobile-gate");
+      var progressText = document.querySelector("#sg-progress-text");
+      var unityInstanceRef = null;
+
+      function isUnsupportedViewport() {
+        var mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        var portrait = window.matchMedia && window.matchMedia("(orientation: portrait)").matches;
+        var narrow = Math.min(window.innerWidth, window.innerHeight) < 720;
+        return mobile || (portrait && narrow);
+      }
+
+      function applyShellLayout() {
+        if (isUnsupportedViewport()) {
+          mobileGate.hidden = false;
+          container.style.visibility = "hidden";
+          return false;
+        }
+        mobileGate.hidden = true;
+        container.style.visibility = "visible";
+        fitCanvasToSixteenNine();
+        return true;
+      }
+
+      function fitCanvasToSixteenNine() {
+        var maxW = Math.min(window.innerWidth - 48, 1600);
+        var maxH = Math.min(window.innerHeight - 160, 900);
+        var width = maxW;
+        var height = Math.round(width * 9 / 16);
+        if (height > maxH) {
+          height = maxH;
+          width = Math.round(height * 16 / 9);
+        }
+        canvas.style.width = width + "px";
+        canvas.style.height = height + "px";
+        container.style.width = width + "px";
+        container.style.height = (height + 48) + "px";
+      }
+
+      function unityShowBanner(msg, type) {
+        var warningBanner = document.querySelector("#unity-warning");
+        function updateBannerVisibility() {
+          warningBanner.style.display = warningBanner.children.length ? "block" : "none";
+        }
+        var div = document.createElement("div");
+        div.innerHTML = msg;
+        warningBanner.appendChild(div);
+        if (type == "error") {
+          div.style = "background: #c45c6a; color: #fff; padding: 10px;";
+          errorMessage.textContent = msg;
+          errorPanel.hidden = false;
+        } else {
+          if (type == "warning") div.style = "background: #e8d9a8; padding: 10px;";
+          setTimeout(function () {
+            warningBanner.removeChild(div);
+            updateBannerVisibility();
+          }, 5000);
+        }
+        updateBannerVisibility();
+      }
+
+      function unlockAudioAndFocus(instance) {
+        try { canvas.focus(); } catch (e) {}
+        if (!instance) return;
+        try {
+          instance.SendMessage("MainApp", "UnlockAudioFromWebShell");
+        } catch (e) {}
+      }
+
+      window.addEventListener("resize", applyShellLayout);
+      document.querySelector("#sg-reload").onclick = function () {
+        window.location.reload();
+      };
+
+      if (!applyShellLayout()) {
+        // Keep shell visible with desktop guidance; do not auto-start Unity on unsupported views.
+      }
+
+      var buildUrl = "Build";
+      var loaderUrl = buildUrl + "/WebGL-Final-Release.loader.js";
+      var config = {
+        arguments: [],
+        dataUrl: buildUrl + "/WebGL-Final-Release.data.unityweb",
+        frameworkUrl: buildUrl + "/WebGL-Final-Release.framework.js.unityweb",
+        codeUrl: buildUrl + "/WebGL-Final-Release.wasm.unityweb",
+        streamingAssetsUrl: "StreamingAssets",
+        companyName: "DefaultCompany",
+        productName: "Shadow_Garden",
+        productVersion: "0.1.0",
+        showBanner: unityShowBanner,
+        matchWebGLToCanvasSize: true,
+        devicePixelRatio: 1
+      };
+
+
+      document.querySelector("#unity-loading-bar").style.display = "block";
+
+      var script = document.createElement("script");
+      script.src = loaderUrl;
+      script.onload = function () {
+        createUnityInstance(canvas, config, function (progress) {
+          var pct = Math.round(100 * progress);
+          document.querySelector("#unity-progress-bar-full").style.width = pct + "%";
+          if (progressText) progressText.textContent = pct + "%";
+        }).then(function (unityInstance) {
+          unityInstanceRef = unityInstance;
+          document.querySelector("#unity-loading-bar").style.display = "none";
+          startOverlay.hidden = false;
+          document.querySelector("#unity-fullscreen-button").onclick = function () {
+            unityInstance.SetFullscreen(1);
+          };
+
+          playStart.onclick = function () {
+            startOverlay.hidden = true;
+            unlockAudioAndFocus(unityInstance);
+          };
+
+          window.addEventListener("blur", function () {
+            // Game-side focus overlay pauses timer while Playing.
+          });
+          window.addEventListener("focus", function () {
+            try { canvas.focus(); } catch (e) {}
+          });
+
+        }).catch(function (message) {
+          errorMessage.textContent = String(message || "알 수 없는 오류");
+          errorPanel.hidden = false;
+          document.querySelector("#unity-loading-bar").style.display = "none";
+        });
+      };
+      script.onerror = function () {
+        errorMessage.textContent = "로더를 불러오지 못했습니다. 네트워크 또는 빌드 경로를 확인하세요.";
+        errorPanel.hidden = false;
+        document.querySelector("#unity-loading-bar").style.display = "none";
+      };
+
+      if (!isUnsupportedViewport()) {
+        document.body.appendChild(script);
+      } else {
+        document.querySelector("#unity-loading-bar").style.display = "none";
+      }
+    </script>
+  </body>
+</html>
