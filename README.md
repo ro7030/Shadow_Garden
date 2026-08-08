@@ -5,7 +5,7 @@
 ## 바로 확인하기
 
 - [WebGL 플레이](https://ro7030.github.io/Shadow_Garden/)
-- [NAN 2026 실제 플레이 영상 — 32초](https://ro7030.github.io/Shadow_Garden/media/shadow-garden-nan2026-gameplay.mp4)
+- [실제 플레이 영상 — 32초](https://ro7030.github.io/Shadow_Garden/media/shadow-garden-nan2026-gameplay.mp4)
 - [전체 소스와 커밋 기록](https://github.com/ro7030/Shadow_Garden)
 
 WebGL은 데스크톱 Chrome 또는 macOS Safari, 1280×720 이상의 화면과 키보드·마우스를 권장합니다. 로딩 완료 후 `플레이 시작`을 클릭해야 캔버스 포커스와 오디오가 활성화됩니다.
